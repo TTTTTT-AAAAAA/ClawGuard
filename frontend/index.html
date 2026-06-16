@@ -33,29 +33,36 @@
               <small>UKey 校验、登录账号</small>
             </span>
           </button>
-          <button class="workflow-step" data-view="capture" type="button">
+          <button class="workflow-step" data-view="agent" type="button">
             <span class="step-index">2</span>
+            <span>
+              <strong>Agent 接入</strong>
+              <small>配置 OpenClaw 或使用内置模拟</small>
+            </span>
+          </button>
+          <button class="workflow-step" data-view="capture" type="button">
+            <span class="step-index">3</span>
             <span>
               <strong>自动捕获</strong>
               <small>接收 OpenClaw 请求并预检</small>
             </span>
           </button>
           <button class="workflow-step" data-view="review" type="button">
-            <span class="step-index">3</span>
+            <span class="step-index">4</span>
             <span>
               <strong>人工审核</strong>
               <small>同意、拒绝或修改</small>
             </span>
           </button>
           <button class="workflow-step" data-view="result" type="button">
-            <span class="step-index">4</span>
+            <span class="step-index">5</span>
             <span>
               <strong>结果复核</strong>
               <small>查看状态、日志、结果</small>
             </span>
           </button>
           <button class="workflow-step" data-view="security" type="button">
-            <span class="step-index">5</span>
+            <span class="step-index">6</span>
             <span>
               <strong>策略审计</strong>
               <small>策略授权、审计留痕</small>
@@ -179,36 +186,72 @@
             </div>
             <pre id="cflRaw" class="result compact mt-3"></pre>
 
-            <p class="eyebrow mt-4">认证链路</p>
+            <p class="eyebrow mt-4">工作流</p>
             <div class="guide-list">
-              <div><span>01</span><strong>CFL 状态</strong><small>确认 UKey、DLL 和运行模式。</small></div>
-              <div><span>02</span><strong>账号登录</strong><small>确认后端连接和用户身份。</small></div>
-              <div><span>03</span><strong>Agent 接入</strong><small>配置 OpenClaw 地址或使用内置模拟。</small></div>
-              <div><span>04</span><strong>捕获审核</strong><small>OpenClaw 请求进入预检和人工审核。</small></div>
-              <div><span>05</span><strong>结果审计</strong><small>查看沙箱结果、策略授权和审计记录。</small></div>
+              <div><span>01</span><strong>CFL 认证</strong><small>UKey 校验、账号登录</small></div>
+              <div><span>02</span><strong>Agent 接入</strong><small>配置或模拟 Agent</small></div>
+              <div><span>03</span><strong>自动捕获</strong><small>预检 OpenClaw 请求</small></div>
+              <div><span>04</span><strong>人工审核</strong><small>审批或否决</small></div>
+              <div><span>05</span><strong>结果复核</strong><small>沙箱产物</small></div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════
+           STEP 2 — Agent 接入配置
+           ════════════════════════════════════════════════════════ -->
+      <section id="view-agent" class="app-view">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 02 / AGENT</p>
+          <h1>OpenClaw Agent 接入</h1>
+          <p>配置 OpenClaw Agent 连接地址，或使用内置模拟模式快速演示。</p>
+        </div>
+
+        <div class="view-grid two">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">连接配置</p>
+                <h2>Agent 地址与注册</h2>
+              </div>
+              <span id="agentStatusBadge" class="status-pill muted">未连接</span>
             </div>
 
-            <!-- Agent 配置面板 -->
-            <div id="agentConfigPanel" class="mt-4" style="display:none">
-              <p class="eyebrow">🤖 Agent 配置</p>
-              <h3>OpenClaw 接入配置</h3>
-              <label class="form-label mt-2" for="agentAddress">Agent 地址</label>
-              <div class="input-group">
-                <input id="agentAddress" class="form-control" value="http://localhost:8000" placeholder="http://agent-ip:port" />
-                <button class="btn btn-outline-primary" id="registerAgentBtn" type="button">注册</button>
-              </div>
-              <small class="text-muted">输入远程 OpenClaw Agent 的地址，或使用下方内置模拟模式</small>
+            <label class="form-label mt-2" for="agentAddress">Agent 地址</label>
+            <div class="input-group">
+              <input id="agentAddress" class="form-control" value="http://localhost:8000" placeholder="http://agent-ip:port" />
+              <button class="btn btn-outline-primary" id="registerAgentBtn2" type="button">注册</button>
+            </div>
+            <small class="text-muted">输入远程 OpenClaw Agent 的地址。留空则使用本地模拟模式。</small>
 
-              <div class="button-row mt-3">
-                <button class="btn btn-outline-success" id="demoAttacksBtn" type="button">🔥 一键生成攻击样本</button>
-                <button class="btn btn-outline-info" id="demoSafeBtn" type="button">✅ 生成正常请求</button>
-                <button class="btn btn-outline-secondary" id="refreshAgentBtn" type="button">刷新状态</button>
-              </div>
-              <div id="agentSummary" class="summary-box mt-3">
-                <strong>Agent 状态</strong>
-                <p>点击「刷新状态」查看已注册 Agent。点击「一键生成攻击样本」自动产生测试数据。</p>
-              </div>
-              <pre id="agentRaw" class="result compact mt-3"></pre>
+            <div class="button-row mt-3">
+              <button class="btn btn-outline-success" id="demoAttacksBtn" type="button">🔥 一键生成攻击样本</button>
+              <button class="btn btn-outline-info" id="demoSafeBtn" type="button">✅ 生成正常请求</button>
+              <button class="btn btn-outline-secondary" id="refreshAgentBtn" type="button">刷新状态</button>
+            </div>
+
+            <div id="agentSummary" class="summary-box mt-3">
+              <strong>Agent 状态</strong>
+              <p>登录后点击「刷新状态」查看 Agent 连接情况。点「一键生成攻击样本」自动产生 6 条测试数据到审核队列。</p>
+            </div>
+            <pre id="agentRaw" class="result compact mt-3"></pre>
+          </div>
+
+          <div class="panel section-panel guide-panel">
+            <p class="eyebrow">快速开始</p>
+            <h2>三种使用模式</h2>
+            <div class="guide-list">
+              <div><span>🖥</span><strong>本地模拟</strong><small>不配地址，直接点「一键生成攻击样本」即可演示所有功能。</small></div>
+              <div><span>🔗</span><strong>远程 Agent</strong><small>填写真实 OpenClaw Agent 地址，注册后自动推送数据。</small></div>
+              <div><span>🧪</span><strong>混合模式</strong><small>远程 Agent 接入的同时，用模拟按钮补充测试场景。</small></div>
+            </div>
+            <p class="eyebrow mt-4">预设攻击场景</p>
+            <div class="guide-list">
+              <div><span>🔥</span><strong>SQL 注入</strong><small>万能密码、联合查询、堆叠注入</small></div>
+              <div><span>🔥</span><strong>命令注入</strong><small>反弹 Shell、挖矿脚本、下载木马</small></div>
+              <div><span>🔥</span><strong>敏感泄露</strong><small>私钥、密码、微信路径、云元数据</small></div>
             </div>
           </div>
         </div>

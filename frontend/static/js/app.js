@@ -411,11 +411,9 @@ async function login(username, password) {
   setCard("loginCard", "已登录", `${username}，角色 ${body.role}`, "ok");
   setSummary("loginSummary", "登录成功", "即将进入 OpenClaw 捕获界面。", "ok");
   // Show agent config panel
-  const panel = $("agentConfigPanel");
-  if (panel) panel.style.display = "block";
   setCard("agentCard", "就绪", "已登录，可配置 Agent 或运行模拟测试", "ok");
   refreshAgentStatus();
-  setView("capture");
+  setView("agent");
   return body;
 }
 
@@ -930,6 +928,8 @@ function bindEvents() {
     origSetView(viewName);
     if (viewName === "threat") {
       loadThreatQueue($("threatFilter").value);
+    } else if (viewName === "agent") {
+      refreshAgentStatus();
     }
   };
 }
