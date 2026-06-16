@@ -413,7 +413,7 @@ async function login(username, password) {
   // Show agent config panel
   setCard("agentCard", "就绪", "已登录，可配置 Agent 或运行模拟测试", "ok");
   refreshAgentStatus();
-  setView("agent");
+  setView("capture");
   return body;
 }
 
@@ -870,23 +870,6 @@ function bindEvents() {
   };
 
   // Load threat data when switching to threat view
-  const agentRegisterBtn = $("registerAgentBtn") || $("registerAgentBtn2");
-  agentRegisterBtn.onclick = async () => {
-    try {
-      requireLogin();
-      const address = $("agentAddress").value;
-      const body = await request("/api/agents/register", {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ address, name: "OpenClaw Agent" }),
-      });
-      setSummary("agentSummary", "Agent 注册成功", `ID: ${body.agent.agent_id} | 地址: ${body.agent.address || "local"}`);
-      refreshAgentStatus();
-    } catch (error) {
-      $("agentSummary").innerHTML = `<strong>注册失败</strong><p>${escapeHtml(error.message)}</p>`;
-    }
-  };
-
   $("refreshAgentBtn").onclick = () => refreshAgentStatus();
 
   $("demoAttacksBtn").onclick = async () => {
@@ -929,8 +912,6 @@ function bindEvents() {
     origSetView(viewName);
     if (viewName === "threat") {
       loadThreatQueue($("threatFilter").value);
-    } else if (viewName === "agent") {
-      refreshAgentStatus();
     }
   };
 }
