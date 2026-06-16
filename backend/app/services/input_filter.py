@@ -7,11 +7,33 @@ from ..security.sanitizer import sanitize_text
 
 
 DENY_PATTERNS = [
+    # Sensitive data
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    # Path traversal
     re.compile(r"(^|[\\/])etc[\\/]passwd"),
     re.compile(r"~[\\/]\.ssh"),
     re.compile(r"(^|[\\/])\.\.([\\/]|$)|\.\.[\\/]"),
+    # Cloud metadata
     re.compile(r"169\.254\.169\.254"),
+    # SQL injection: classic auth bypass + boolean blind
+    re.compile(r"'\s*(?:OR|AND)\s+(?:['(\d])", re.I),
+    # SQL injection: UNION SELECT
+    re.compile(r"'\s*UNION\s+(?:ALL\s+)?SELECT", re.I),
+    # SQL injection: stacked queries (; DROP / DELETE / UPDATE / INSERT / ALTER)
+    re.compile(r"';?\s*(?:DROP|DELETE|UPDATE|INSERT|ALTER|CREATE|EXEC|TRUNCATE)\b", re.I),
+    # SQL injection: file operations
+    re.compile(r"\b(?:LOAD_FILE|INTO\s+OUTFILE|INTO\s+DUMPFILE)\b", re.I),
+    # SQL injection: time-based blind
+    re.compile(r"\b(?:SLEEP|BENCHMARK)\s*\(", re.I),
+    # SQL injection: information_schema enumeration
+    re.compile(r"\bINFORMATION_SCHEMA\b", re.I),
+    # SQL injection: MSSQL command execution
+    re.compile(r"\bxp_cmdshell\b", re.I),
+    # SQL injection: ending comment injection (single line)
+    re.compile(r"--\s*$|#\s*$", re.MULTILINE),
+    # Path pattern for sensitive Windows apps
+    re.compile(r"[\\/]WeChat[\\/]", re.I),
+    re.compile(r"[\\/]wxid_", re.I),
 ]
 MASK_PATTERNS = [
     re.compile(r"AKIA[0-9A-Z]{16}"),
