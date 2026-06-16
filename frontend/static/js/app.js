@@ -410,8 +410,6 @@ async function login(username, password) {
   setPill("navLoginBadge", `${username} / ${body.role}`, "ok");
   setCard("loginCard", "已登录", `${username}，角色 ${body.role}`, "ok");
   setSummary("loginSummary", "登录成功", "即将进入 OpenClaw 捕获界面。", "ok");
-  // Show agent config panel
-  setCard("agentCard", "就绪", "已登录，可配置 Agent 或运行模拟测试", "ok");
   refreshAgentStatus();
   setView("capture");
   return body;
@@ -424,8 +422,6 @@ async function refreshAgentStatus() {
     const count = agents.length;
     $("agentSummary").innerHTML =
       `<strong>Agent 状态</strong><p>已注册 ${count} 个 Agent${count ? "：" + agents.map(a => a.name + "@" + (a.address || "local")).join(", ") : ""} | 内置模拟可用: ${body.local_stub_available ? "✅" : "❌"} | 攻击模板: ${body.demo_attacks_count} 种</p>`;
-    setCard("agentCard", count > 0 ? `${count} 个 Agent 在线` : "本地模式", count > 0 ? agents.map(a => a.name).join(", ") : "未注册远程 Agent，使用本地模拟", count > 0 ? "ok" : "warn");
-    showRaw("agentRaw", body);
   } catch (error) {
     $("agentSummary").innerHTML = `<strong>Agent 状态</strong><p>${escapeHtml(error.message)}</p>`;
   }
@@ -884,8 +880,7 @@ function bindEvents() {
       const approved = results.filter(r => r.filter_decision === "ALLOW" && r.recommendation === "approve").length;
       $("agentSummary").innerHTML =
         `<strong>攻击样本已生成</strong><p>共 ${results.length} 条 | 拦截 ${denied} 条 | 放行 ${approved} 条</p>`;
-      setCard("agentCard", "测试完成", `${results.length} 条请求已进入审核队列`, "ok");
-      showRaw("agentRaw", body);
+      
     } catch (error) {
       $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
     }
@@ -901,7 +896,6 @@ function bindEvents() {
       const review = body.review || {};
       $("agentSummary").innerHTML =
         `<strong>正常请求已生成</strong><p>Review: ${review.review_id} | Filter: ${review.filter_decision} | Rec: ${review.recommendation}</p>`;
-      showRaw("agentRaw", body);
     } catch (error) {
       $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
     }
