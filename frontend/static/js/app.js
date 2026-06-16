@@ -83,6 +83,21 @@ function setView(viewName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function setSidebarCollapsed(collapsed) {
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  const toggle = $("sidebarToggle");
+  if (!toggle) return;
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
+  toggle.textContent = collapsed ? "›" : "‹";
+}
+
+function toggleSidebar() {
+  const collapsed = !document.body.classList.contains("sidebar-collapsed");
+  setSidebarCollapsed(collapsed);
+  localStorage.setItem("clawguard.sidebarCollapsed", collapsed ? "1" : "0");
+}
+
 async function openView(viewName) {
   setView(viewName);
   if (currentView === "review" && token) {
@@ -395,8 +410,27 @@ async function login(username, password) {
   setPill("navLoginBadge", `${username} / ${body.role}`, "ok");
   setCard("loginCard", "已登录", `${username}，角色 ${body.role}`, "ok");
   setSummary("loginSummary", "登录成功", "即将进入 OpenClaw 捕获界面。", "ok");
+  // Show agent config panel
+  const panel = $("agentConfigPanel");
+  if (panel) panel.style.display = "block";
+  setCard("agentCard", "就绪", "已登录，可配置 Agent 或运行模拟测试", "ok");
+  refreshAgentStatus();
   setView("capture");
   return body;
+}
+
+async function refreshAgentStatus() {
+  try {
+    const body = await request("/api/agents/status", { headers: authHeaders() });
+    const agents = body.agents || [];
+    const count = agents.length;
+    $("agentSummary").innerHTML =
+      `<strong>Agent 状态</strong><p>已注册 ${count} 个 Agent${count ? "：" + agents.map(a => a.name + "@" + (a.address || "local")).join(", ") : ""} | 内置模拟可用: ${body.local_stub_available ? "✅" : "❌"} | 攻击模板: ${body.demo_attacks_count} 种</p>`;
+    setCard("agentCard", count > 0 ? `${count} 个 Agent 在线` : "本地模式", count > 0 ? agents.map(a => a.name).join(", ") : "未注册远程 Agent，使用本地模拟", count > 0 ? "ok" : "warn");
+    showRaw("agentRaw", body);
+  } catch (error) {
+    $("agentSummary").innerHTML = `<strong>Agent 状态</strong><p>${escapeHtml(error.message)}</p>`;
+  }
 }
 
 async function submitTask() {
@@ -554,6 +588,10 @@ async function loadTask(suffix, mode) {
 }
 
 function bindEvents() {
+  if ($("sidebarToggle")) {
+    $("sidebarToggle").addEventListener("click", toggleSidebar);
+  }
+
   document.querySelectorAll(".workflow-step").forEach((step) => {
     step.addEventListener("click", () => openView(step.dataset.view));
   });
@@ -834,6 +872,59 @@ function bindEvents() {
   };
 
   // Load threat data when switching to threat view
+  $("registerAgentBtn").onclick = async () => {
+    try {
+      requireLogin();
+      const address = $("agentAddress").value;
+      const body = await request("/api/agents/register", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ address, name: "OpenClaw Agent" }),
+      });
+      setSummary("agentSummary", "Agent 注册成功", `ID: ${body.agent.agent_id} | 地址: ${body.agent.address || "local"}`);
+      refreshAgentStatus();
+    } catch (error) {
+      $("agentSummary").innerHTML = `<strong>注册失败</strong><p>${escapeHtml(error.message)}</p>`;
+    }
+  };
+
+  $("refreshAgentBtn").onclick = () => refreshAgentStatus();
+
+  $("demoAttacksBtn").onclick = async () => {
+    try {
+      requireLogin();
+      const body = await request("/api/agents/demo/run-attacks", {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const results = body.results || [];
+      const denied = results.filter(r => r.filter_decision === "DENY").length;
+      const approved = results.filter(r => r.filter_decision === "ALLOW" && r.recommendation === "approve").length;
+      $("agentSummary").innerHTML =
+        `<strong>攻击样本已生成</strong><p>共 ${results.length} 条 | 拦截 ${denied} 条 | 放行 ${approved} 条</p>`;
+      setCard("agentCard", "测试完成", `${results.length} 条请求已进入审核队列`, "ok");
+      showRaw("agentRaw", body);
+    } catch (error) {
+      $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
+    }
+  };
+
+  $("demoSafeBtn").onclick = async () => {
+    try {
+      requireLogin();
+      const body = await request("/api/agents/demo/run-safe", {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const review = body.review || {};
+      $("agentSummary").innerHTML =
+        `<strong>正常请求已生成</strong><p>Review: ${review.review_id} | Filter: ${review.filter_decision} | Rec: ${review.recommendation}</p>`;
+      showRaw("agentRaw", body);
+    } catch (error) {
+      $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
+    }
+  };
+
   const origSetView = setView;
   setView = function(viewName) {
     origSetView(viewName);
@@ -845,5 +936,6 @@ function bindEvents() {
 
 bindEvents();
 activateSample("normal");
+setSidebarCollapsed(localStorage.getItem("clawguard.sidebarCollapsed") === "1");
 setView("login");
 healthCheck();
