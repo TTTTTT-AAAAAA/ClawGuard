@@ -755,8 +755,6 @@ function bindEvents() {
     list.innerHTML = items.map((item) => {
       const analysis = item.analysis || {};
       const risk = analysis.risk_level || "?";
-      const findings = (analysis.filter_result && analysis.filter_result.findings) || [];
-      const ruleNames = findings.map((f) => f.rule || "?").join(", ");
       const ts = new Date(item.created_at).toLocaleString("zh-CN");
       const isDeny = item.filter_decision === "DENY";
       return `<button class="review-item${isDeny ? " review-item-danger" : ""}" data-review-id="${escapeHtml(item.review_id)}" type="button">
@@ -765,7 +763,6 @@ function bindEvents() {
           <small>${escapeHtml(ts)}</small>
         </div>
         <strong style="color:${isDeny ? "#dc3545" : "#fd7e14"}">${escapeHtml(item.action || "?")}</strong>
-        <small>${escapeHtml(ruleNames || "无规则匹配")}</small>
         <small>风险: ${escapeHtml(risk)} | 建议: ${escapeHtml(item.recommendation || "?")}</small>
       </button>`;
     }).join("");
