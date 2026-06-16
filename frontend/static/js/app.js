@@ -327,7 +327,7 @@ function summarizeCflStatus(body) {
   const state = body.mode === "real" && loadable !== false ? "ok" : body.mode === "mock" ? "warn" : "fail";
   setPill("cflModeBadge", mode === "real" ? "真实 CFL" : "模拟 CFL", state);
   setCard("cflCard", mode === "real" ? "真实模式" : "模拟模式", `${dll}，${helper}`, state);
-  setSummary("securitySummary", "CFL 状态已读取", `当前运行在 ${mode} 模式，${dll}，${helper}。`, state);
+  setSummary("cflSummary", "CFL 状态已读取", `当前运行在 ${mode} 模式，${dll}，${helper}。`, state);
 }
 
 function summarizeCflDiag(body) {
@@ -342,7 +342,7 @@ function summarizeCflDiag(body) {
     ? `已到达真实 DLL，但公钥返回全 0。连接码 ${connectHex}，导出码 ${exportHex}，需要继续检查 UKey 应用或容器初始化。`
     : `连接码 ${connectHex}，导出码 ${exportHex}，诊断未发现全 0 公钥。`;
   setCard("cflCard", state === "ok" ? "CFL 可用" : "CFL 需复核", detail, state);
-  setSummary("securitySummary", "CFL 诊断完成", detail, state);
+  setSummary("cflSummary", "CFL 诊断完成", detail, state);
 }
 
 function summarizePolicy(body) {
@@ -376,7 +376,7 @@ async function healthCheck() {
     setCard("backendCard", "连接正常", body.status || "后端 API 可访问", "ok");
     setPill("navApiBadge", `API ${apiBase().replace(/^https?:\/\//, "")}`, "ok");
     setSummary("loginSummary", "后端连接正常", "可以继续登录并提交沙箱任务。", "ok");
-    showRaw("securityRaw", body);
+    showRaw("cflRaw", body);
   } catch (error) {
     setCard("backendCard", "连接失败", error.message, "fail");
     setPill("navApiBadge", "API 不可用", "fail");
@@ -723,11 +723,11 @@ function bindEvents() {
     try {
       const body = await request("/api/auth/cfl/status");
       summarizeCflStatus(body);
-      showRaw("securityRaw", body);
+      showRaw("cflRaw", body);
     } catch (error) {
       setCard("cflCard", "CFL 状态失败", error.message, "fail");
-      setSummary("securitySummary", "CFL 状态读取失败", error.message, "fail");
-      showRaw("securityRaw", error.message);
+      setSummary("cflSummary", "CFL 状态读取失败", error.message, "fail");
+      showRaw("cflRaw", error.message);
     }
   };
 
@@ -736,10 +736,10 @@ function bindEvents() {
       requireLogin();
       const body = await request("/api/auth/cfl/diagnostics", { headers: authHeaders() });
       summarizeCflDiag(body);
-      showRaw("securityRaw", body);
+      showRaw("cflRaw", body);
     } catch (error) {
-      setSummary("securitySummary", "CFL 诊断失败", error.message, "fail");
-      showRaw("securityRaw", error.message);
+      setSummary("cflSummary", "CFL 诊断失败", error.message, "fail");
+      showRaw("cflRaw", error.message);
     }
   };
 }

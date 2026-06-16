@@ -17,6 +17,7 @@ venv/
 # Runtime artifacts
 jobs/
 runtime-logs/
+*.log
 
 # Secrets
 .env
