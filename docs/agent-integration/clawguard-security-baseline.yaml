@@ -1,0 +1,209 @@
+# =============================================================================
+# ClawGuard Security Baseline — Host Configuration Audit
+# =============================================================================
+# Defines the expected secure state for the OpenClaw agent host.
+# ClawGuard compares this baseline against actual host config.
+# Version: 1.0
+# =============================================================================
+
+host:
+  hostname: "SWIFTIE-YYR"
+  platform: "WSL2"
+  distro: "Ubuntu 22.04"
+  kernel: "6.6.87.1-microsoft-standard-WSL2"
+
+# =============================================================================
+# OS SECURITY
+# =============================================================================
+os_security:
+
+  updates:
+    expected_state: "up-to-date"
+    check_command: "apt list --upgradable 2>/dev/null | grep -c upgradable"
+    # 0 = no pending upgrades
+    warning_threshold: 5
+    critical_threshold: 20
+
+  firewall:
+    # WSL2 uses Windows firewall, not iptables natively
+    expected: "managed-by-windows-host"
+    note: "WSL2 instances inherit Windows Firewall rules via the host"
+    iptables_rules_expected: false
+
+  ssh:
+    expected_state: "not-running"
+    # WSL2 typically doesn't run SSH server by default
+    check_command: "systemctl status ssh 2>/dev/null || service ssh status 2>/dev/null"
+    # If running, should be key-only auth, no root login
+
+  root_login:
+    expected: "disabled"
+    check_command: "passwd -S root 2>/dev/null | grep -c 'LP\|NP'"
+    # LP = locked password, NP = no password
+
+# =============================================================================
+# FILE PERMISSIONS
+# =============================================================================
+file_security:
+
+  workspace_permissions:
+    path: "/home/admin_linux/.openclaw/workspace"
+    expected_owner: "admin_linux"
+    expected_mode: "750"
+    sticky_bit: false
+
+  memory_files:
+    path: "/home/admin_linux/.openclaw/workspace/memory/*.md"
+    expected_owner: "admin_linux"
+    expected_mode: "640"
+    # No world-readable memory files
+
+  ssh_directory:
+    path: "/home/admin_linux/.ssh"
+    expected_owner: "admin_linux"
+    expected_mode: "700"
+    # Private keys should be 600, public keys 644
+
+  key_files:
+    patterns:
+      - path: "/home/admin_linux/.ssh/id_*"
+        expected_mode: "600"
+      - path: "/home/admin_linux/.ssh/*.pub"
+        expected_mode: "644"
+      - path: "/home/admin_linux/.ssh/authorized_keys"
+        expected_mode: "600"
+
+# =============================================================================
+# NETWORK EXPOSURE
+# =============================================================================
+network_security:
+
+  listening_ports:
+    # WSL2 - should be minimal
+    check_command: "ss -tlnp 2>/dev/null | tail -n+2"
+    expected_services:
+      - port: 22
+        service: "ssh"       # Only if intentionally enabled
+        allowed: false
+      - port: 8000
+        service: "clawguard" # Only when audit backend is active
+        allowed_with_auth: true
+    max_unexpected_ports: 2
+
+  loopback_only:
+    expected: true
+    # WSL2 services should bind to 127.0.0.1 only
+    check_command: "ss -tlnp 2>/dev/null | grep -v '127.0.0.1\|::1\|\*.*LISTEN'"
+
+# =============================================================================
+# CREDENTIAL MANAGEMENT
+# =============================================================================
+credentials:
+
+  env_vars_check:
+    - var: "CLAWGUARD_SECRET_KEY"
+      expected_setting: "not-default"
+    - var: "OPENCLAW_*"
+      expected_setting: "no-exposure"
+
+  token_storage:
+    expected: "no-tokens-in-plaintext-files"
+    exclude_patterns:
+      - "**/.env*"
+      - "**/token*"
+      - "**/*cred*"
+      - "**/*secret*"
+    # These should be in .gitignore or encrypted
+
+# =============================================================================
+# AUDIT LOGGING
+# =============================================================================
+audit_logging:
+
+  workspace_logs:
+    path: "/home/admin_linux/.openclaw/workspace/memory/"
+    expected_retention_days: 90
+    rotation: "per-session"
+
+  clawguard_audit_feed:
+    enabled: true
+    format: "structured"
+    fields:
+      - event_id
+      - timestamp
+      - event_type
+      - action
+      - tool
+      - resource
+      - result
+      - risk_level
+      - session_id
+
+# =============================================================================
+# COMPLIANCE CHECK DEFINITIONS
+# =============================================================================
+checks:
+
+  - id: "SEC-CHK-001"
+    name: "OS Updates"
+    description: "Check for pending security updates"
+    severity: "high"
+    command: "apt list --upgradable 2>/dev/null | grep -c 'security' || echo 0"
+
+  - id: "SEC-CHK-002"
+    name: "Listening Ports"
+    description: "Check for unexpected listening services"
+    severity: "high"
+    command: "ss -tlnp 2>/dev/null | grep -v '127.0.0.1\|::1' | wc -l"
+
+  - id: "SEC-CHK-003"
+    name: "SSH Config"
+    description: "Check SSH server status"
+    severity: "medium"
+    command: "systemctl is-active ssh 2>/dev/null || echo inactive"
+
+  - id: "SEC-CHK-004"
+    name: "Workspace Permissions"
+    description: "Verify workspace directory permissions"
+    severity: "medium"
+    command: "stat -c '%a %U' /home/admin_linux/.openclaw/workspace 2>/dev/null"
+
+  - id: "SEC-CHK-005"
+    name: "ClawGuard File Integrity"
+    description: "Check if ClawGuard project files have been modified"
+    severity: "high"
+    command: "cd /mnt/d/clawguard && git status --porcelain 2>/dev/null | wc -l"
+
+  - id: "SEC-CHK-006"
+    name: "Root Account Status"
+    description: "Check if root has password-based login"
+    severity: "high"
+    command: "passwd -S root 2>/dev/null | grep -c 'PS' || 0"
+    # PS = password set, which means password login possible
+
+  - id: "SEC-CHK-007"
+    name: "World-Readable Files"
+    description: "Check for sensitive files with world-readable permissions"
+    severity: "medium"
+    command: "find /home/admin_linux/.openclaw -type f -perm /o+r 2>/dev/null | head -20 | wc -l"
+
+  - id: "SEC-CHK-008"
+    name: "Agent Config Integrity"
+    description: "Verify agent policy hasn't been tampered with"
+    severity: "critical"
+    command: "sha256sum /home/admin_linux/.openclaw/workspace/clawguard-integration/clawguard-agent.yaml"
+
+# =============================================================================
+# REMEDIATION
+# =============================================================================
+remediation:
+  auto_fix:
+    enabled: false   # Never auto-fix without review
+    allowed_actions: []
+
+  alert_on:
+    - "SEC-CHK-001"    # OS updates
+    - "SEC-CHK-003"    # SSH config drift
+    - "SEC-CHK-005"    # ClawGuard file changes
+    - "SEC-CHK-006"    # Root login risk
+    - "SEC-CHK-008"    # Policy tampering

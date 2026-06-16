@@ -1,0 +1,190 @@
+# =============================================================================
+# ClawGuard Agent Behavioral Compliance Policy
+# =============================================================================
+# Defines what the OpenClaw agent (main) is allowed/denied to do.
+# ClawGuard uses this to audit agent behavior in real-time.
+# Version: 1.0
+# =============================================================================
+
+agent:
+  id: "openclaw-main"
+  host: "SWIFTIE-YYR"
+  platform: "WSL2 (Linux 6.6.87.1-microsoft-standard-WSL2)"
+  runtime: "node v24.16.0"
+  model: "deepseek/deepseek-v4-flash"
+
+# =============================================================================
+# BEHAVIORAL RULES
+# =============================================================================
+rules:
+
+  # --- File System ---
+  - id: "FS-001"
+    description: "Must not modify files outside workspace without explicit permission"
+    category: "filesystem"
+    severity: "high"
+    action: "deny"
+    conditions:
+      path: "!/home/admin_linux/.openclaw/workspace/**"
+      tool: ["write", "edit", "exec"]
+
+  - id: "FS-002"
+    description: "Must not delete files without using trash/recoverable methods"
+    category: "filesystem"
+    severity: "high"
+    action: "deny"
+    conditions:
+      command_contains: ["rm -rf", "shred", "wipe"]
+
+  - id: "FS-003"
+    description: "Can read ClawGuard project files but must not modify them"
+    category: "filesystem"
+    severity: "high"
+    action: "deny_write"
+    conditions:
+      path: "/mnt/d/clawguard/**"
+      tool: ["write", "edit", "exec"]
+      intent: "modify_clawguard"
+
+  # --- Network ---
+  - id: "NET-001"
+    description: "Must not exfiltrate sensitive data to external services"
+    category: "network"
+    severity: "critical"
+    action: "deny"
+    conditions:
+      data_contains: ["SECRET", "PASSWORD", "TOKEN", "PRIVATE_KEY"]
+      destination: "!localhost"
+
+  - id: "NET-002"
+    description: "External API calls limited to web_search, web_fetch, browser"
+    category: "network"
+    severity: "medium"
+    action: "allow"
+    conditions:
+      tool: ["web_search", "web_fetch", "browser"]
+
+  # --- Execution ---
+  - id: "EXEC-001"
+    description: "Must not run destructive shell commands without explicit approval"
+    category: "execution"
+    severity: "critical"
+    action: "require_approval"
+    conditions:
+      command_contains: ["rm -rf /", "dd if=", "mkfs.", ":(){ :|:& };:", "chmod -R 000 /"]
+
+  - id: "EXEC-002"
+    description: "Docker/container commands require elevated context"
+    category: "execution"
+    severity: "high"
+    action: "require_elevated"
+    conditions:
+      command_contains: ["docker", "podman", "containerd"]
+
+  - id: "EXEC-003"
+    description: "System config changes must be inspected first"
+    category: "execution"
+    severity: "high"
+    action: "require_inspect_first"
+    conditions:
+      target: ["crontab", "systemd", "nginx", "ssh config", "shell rc"]
+
+  # --- Identity & Data ---
+  - id: "DATA-001"
+    description: "Must not read private keys, tokens, or credentials from user home"
+    category: "data"
+    severity: "critical"
+    action: "deny"
+    conditions:
+      path_match: ["**/.ssh/**", "**/.aws/**", "**/.config/gcloud/**", "**/token*", "**/*.pem"]
+
+  - id: "DATA-002"
+    description: "Must honor memory redlines — never exfiltrate private data"
+    category: "data"
+    severity: "critical"
+    action: "deny"
+    conditions:
+      access_type: "exfiltrate"
+
+  # --- Audit & Compliance ---
+  - id: "AUDIT-001"
+    description: "Every external action must be logged for audit"
+    category: "audit"
+    severity: "medium"
+    action: "require_log"
+    conditions:
+      tool: ["exec", "write", "edit", "web_search", "browser", "web_fetch"]
+
+  - id: "AUDIT-002"
+    description: "Sessions with external users must disclose agent identity"
+    category: "audit"
+    severity: "medium"
+    action: "require_disclosure"
+    conditions:
+      channel: ["discord", "telegram", "signal", "group_chat"]
+
+# =============================================================================
+# ROLE-BASED ACCESS
+# =============================================================================
+# Mirrors ClawGuard's PBAC model for agent-side enforcement
+roles:
+  audited_agent:
+    allow_tools:
+      - read
+      - write
+      - edit
+      - exec
+      - web_search
+      - web_fetch
+      - browser
+      - memory_search
+      - memory_get
+      - process
+      - dir_list
+      - dir_fetch
+      - file_fetch
+    deny_tools:
+      - tts          # no autonomous voice broadcast
+      - sessions_spawn # must be reviewed
+    deny_actions:
+      - modify_clawguard
+      - delete_workspace
+      - exfiltrate_data
+      - modify_system_config
+    require_review:
+      - exec_shell_destructive
+      - browser_form_submit
+      - sessions_messaging
+
+# =============================================================================
+# CLAWGUARD INTEGRATION
+# =============================================================================
+integration:
+  backend_url: "http://127.0.0.1:8000"
+  audit_endpoint: "/api/audit"
+  review_endpoint: "/api/reviews"
+  policy_endpoint: "/api/policies"
+
+  # Audit log shipping config
+  audit_shipping:
+    enabled: true
+    batch_size: 10
+    flush_interval_seconds: 60
+    event_types:
+      - "AGENT_ACTION"
+      - "AGENT_DECISION"
+      - "AGENT_CONFIG_CHECK"
+      - "AGENT_COMPLIANCE_VIOLATION"
+
+  # Review integration
+  review_integration:
+    enabled: true
+    pre_execution_review: true    # Capture actions to ClawGuard before execution
+    capture_endpoint: "/api/reviews/capture"
+
+  # Compliance checks
+  compliance:
+    check_interval_minutes: 30
+    report_to_audit: true
+    auto_remediate: false
+    severity_threshold: "medium"
