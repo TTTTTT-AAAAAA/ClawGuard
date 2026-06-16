@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import admin_routes, audit_routes, auth_routes, policy_routes, review_routes, task_routes
+from .api import admin_routes, agent_routes, audit_routes, auth_routes, policy_routes, review_routes, system_routes, task_routes
 from .database import init_db
 
 
@@ -21,6 +21,8 @@ app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"]
 app.include_router(audit_routes.router, prefix="/api/audit", tags=["audit"])
 app.include_router(policy_routes.router, prefix="/api/policies", tags=["policies"])
 app.include_router(admin_routes.router, prefix="/api/admin", tags=["admin"])
+app.include_router(agent_routes.router, prefix="/api/agents", tags=["agents"])
+app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
 
 
 @app.on_event("startup")
