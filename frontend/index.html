@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClawGuard Web 安全运行控制台</title>
+    <link rel="icon" href="data:," />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="./static/css/styles.css?v=20260616-resubmit" rel="stylesheet" />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg app-nav">
+      <div class="container-fluid">
+        <div>
+          <div class="navbar-brand mb-0">ClawGuard Web</div>
+          <div class="nav-subtitle">UKey 身份可信接入 + 指令过滤 + Docker 沙箱 + 审计追踪</div>
+        </div>
+        <div class="nav-actions">
+          <span id="navApiBadge" class="status-pill neutral">API 127.0.0.1:8000</span>
+          <span id="navLoginBadge" class="status-pill muted">未登录</span>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container-fluid app-shell">
+      <section class="workflow-strip" aria-label="运行流程">
+        <button class="workflow-step active" data-view="login" type="button">
+          <span class="step-index">1</span>
+          <span>
+            <strong>连接服务</strong>
+            <small>检查后端、登录账号</small>
+          </span>
+        </button>
+        <button class="workflow-step" data-view="capture" type="button">
+          <span class="step-index">2</span>
+          <span>
+            <strong>自动捕获</strong>
+            <small>接收 OpenClaw 请求并预检</small>
+          </span>
+        </button>
+        <button class="workflow-step" data-view="review" type="button">
+          <span class="step-index">3</span>
+          <span>
+            <strong>人工审核</strong>
+            <small>同意、拒绝或修改</small>
+          </span>
+        </button>
+        <button class="workflow-step" data-view="result" type="button">
+          <span class="step-index">4</span>
+          <span>
+            <strong>结果复核</strong>
+            <small>查看状态、日志、结果</small>
+          </span>
+        </button>
+        <button class="workflow-step" data-view="security" type="button">
+          <span class="step-index">5</span>
+          <span>
+            <strong>安全审计</strong>
+            <small>检查 CFL、策略、审计</small>
+          </span>
+        </button>
+      </section>
+
+      <section class="status-grid" aria-label="系统状态">
+        <article id="backendCard" class="status-card">
+          <span class="card-kicker">后端服务</span>
+          <strong>待检查</strong>
+          <small>点击健康检查确认 API 可用</small>
+        </article>
+        <article id="loginCard" class="status-card">
+          <span class="card-kicker">身份认证</span>
+          <strong>未登录</strong>
+          <small>默认账号 admin / admin123</small>
+        </article>
+        <article id="taskCard" class="status-card">
+          <span class="card-kicker">沙箱任务</span>
+          <strong>暂无任务</strong>
+          <small>任务会在 Docker 隔离环境内执行</small>
+        </article>
+        <article id="cflCard" class="status-card">
+          <span class="card-kicker">CFL UKey</span>
+          <strong>待检测</strong>
+          <small>确认 DLL、驱动和设备状态</small>
+        </article>
+      </section>
+
+      <section id="view-login" class="app-view active">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 01 / ACCESS</p>
+          <h1>连接服务并完成身份认证</h1>
+          <p>进入系统后，页面会自动切换到 OpenClaw 捕获界面。</p>
+        </div>
+
+        <div class="view-grid two">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">服务入口</p>
+                <h2>连接与登录</h2>
+              </div>
+              <button class="btn btn-outline-secondary btn-sm" id="healthBtn" type="button">健康检查</button>
+            </div>
+
+            <label class="form-label" for="apiBase">API 地址</label>
+            <input id="apiBase" class="form-control" value="http://127.0.0.1:8000" />
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label" for="username">用户名</label>
+                <input id="username" class="form-control" value="admin" autocomplete="username" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="password">密码</label>
+                <input id="password" class="form-control" value="admin123" type="password" autocomplete="current-password" />
+              </div>
+            </div>
+
+            <div class="button-row mt-3">
+              <button class="btn btn-primary" id="loginBtn" type="button">登录并进入捕获</button>
+              <button class="btn btn-outline-primary" id="demoLoginBtn" type="button">管理员演示登录</button>
+            </div>
+
+            <div id="loginSummary" class="summary-box mt-3">
+              <strong>当前状态</strong>
+              <p>尚未登录。登录后才能捕获 OpenClaw 请求、查看审计和策略。</p>
+            </div>
+          </div>
+
+          <div class="panel section-panel guide-panel">
+            <p class="eyebrow">操作路径</p>
+            <h2>从这里开始</h2>
+            <div class="guide-list">
+              <div><span>01</span><strong>登录</strong><small>确认后端连接和用户身份。</small></div>
+              <div><span>02</span><strong>捕获</strong><small>OpenClaw 请求进入待审核队列。</small></div>
+              <div><span>03</span><strong>审核</strong><small>同意、否决，或修改后重新预检。</small></div>
+              <div><span>04</span><strong>复核</strong><small>查看沙箱结果、CFL 状态和审计记录。</small></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-capture" class="app-view">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 02 / CAPTURE</p>
+          <h1>OpenClaw 自动捕获</h1>
+          <p>低风险请求会自动通过并生成任务；有风险请求会自动拦截，等待人工审核。</p>
+        </div>
+
+        <div class="view-grid two-wide">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">请求样例</p>
+                <h2>选择捕获场景</h2>
+              </div>
+              <span id="filterBadge" class="status-pill muted">待检测</span>
+            </div>
+
+            <div class="sample-grid mb-3" aria-label="任务样例">
+              <button class="sample-button active" data-sample="normal" type="button">
+                <strong>正常运行</strong>
+                <small>通过过滤并进入审核</small>
+              </button>
+              <button class="sample-button" data-sample="mask" type="button">
+                <strong>敏感字段</strong>
+                <small>触发脱敏审计</small>
+              </button>
+              <button class="sample-button" data-sample="privateKey" type="button">
+                <strong>私钥泄露</strong>
+                <small>高风险输入拦截</small>
+              </button>
+              <button class="sample-button" data-sample="dangerousCommand" type="button">
+                <strong>危险参数</strong>
+                <small>命令过滤拦截</small>
+              </button>
+            </div>
+
+            <label class="form-label" for="action">任务动作</label>
+            <select id="action" class="form-select mb-3">
+              <option value="run_openclaw">run_openclaw：运行 OpenClaw 安全分析</option>
+              <option value="analyze_file">analyze_file：分析输入文件</option>
+              <option value="export_result">export_result：导出分析结果</option>
+            </select>
+
+            <label class="form-label" for="params">运行参数 JSON</label>
+            <textarea id="params" class="form-control codebox mb-3" spellcheck="false">{"mode":"safe","input_name":"request.json"}</textarea>
+
+            <label class="form-label" for="inputText">输入内容</label>
+            <textarea id="inputText" class="form-control codebox tall mb-3" spellcheck="false">{"sample":"hello openclaw","intent":"safe demo"}</textarea>
+
+            <div class="button-row">
+              <button class="btn btn-success flex-grow-1" id="captureTaskBtn" type="button">开始捕获</button>
+              <button class="btn btn-outline-dark" id="reviewQueueBtn" type="button">进入审核界面</button>
+            </div>
+          </div>
+
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">预检反馈</p>
+                <h2>捕获结果</h2>
+              </div>
+            </div>
+            <div id="taskSubmitSummary" class="summary-box">
+              <strong>等待捕获</strong>
+              <p>选择一个场景后点击“开始捕获”，系统会自动分流为通过或待审核。</p>
+            </div>
+            <pre id="taskSubmitResult" class="result mt-3"></pre>
+
+            <div class="section-head mt-4">
+              <div>
+                <p class="eyebrow">捕获留痕</p>
+                <h2>捕获记录</h2>
+              </div>
+              <button class="btn btn-outline-secondary btn-sm" id="captureRecordsBtn" type="button">刷新记录</button>
+            </div>
+            <div id="captureRecords" class="review-list">
+              <div class="empty-state">暂无捕获记录。每次捕获都会在这里留下时间和处理结果。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-review" class="app-view">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 03 / REVIEW</p>
+          <h1>人工审核队列</h1>
+          <p>查看系统建议，决定同意执行、否决，或修改内容后重新预检。</p>
+        </div>
+
+        <div class="view-grid two">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">待处理</p>
+                <h2>审核队列</h2>
+              </div>
+              <button class="btn btn-outline-secondary btn-sm" id="refreshTaskBtn" type="button">刷新状态</button>
+            </div>
+
+            <div id="reviewQueue" class="review-list mb-3">
+              <div class="empty-state">暂无待审核任务。捕获 OpenClaw 请求后会显示在这里。</div>
+            </div>
+
+            <div class="button-row">
+              <button class="btn btn-outline-primary" id="goCaptureBtn" type="button">返回捕获</button>
+              <button class="btn btn-outline-dark" id="goSecurityFromReviewBtn" type="button">查看审计</button>
+            </div>
+          </div>
+
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">决策</p>
+                <h2>同意 / 否决 / 修改</h2>
+              </div>
+            </div>
+
+            <label class="form-label" for="reviewId">Review ID</label>
+            <input id="reviewId" class="form-control mb-3" placeholder="选择队列项后自动填入" />
+
+            <label class="form-label" for="reviewNote">审核意见</label>
+            <textarea id="reviewNote" class="form-control mb-3" rows="2" placeholder="可填写拒绝原因或修改说明"></textarea>
+
+            <div class="review-command-editor">
+              <p class="eyebrow">修改后重新投递</p>
+              <label class="form-label" for="reviewAction">捕获动作</label>
+              <select id="reviewAction" class="form-select mb-3">
+                <option value="run_openclaw">run_openclaw：运行 OpenClaw 安全分析</option>
+                <option value="analyze_file">analyze_file：分析输入文件</option>
+                <option value="export_result">export_result：导出分析结果</option>
+              </select>
+
+              <label class="form-label" for="reviewParams">捕获参数 JSON</label>
+              <textarea id="reviewParams" class="form-control codebox mb-3" spellcheck="false"></textarea>
+
+              <label class="form-label" for="reviewInputText">捕获输入内容</label>
+              <textarea id="reviewInputText" class="form-control codebox tall mb-3" spellcheck="false"></textarea>
+            </div>
+
+            <div class="button-row mb-3">
+              <button class="btn btn-success" id="approveReviewBtn" type="button">同意执行</button>
+              <button class="btn btn-outline-danger" id="rejectReviewBtn" type="button">否决</button>
+              <button class="btn btn-outline-primary" id="modifyReviewBtn" type="button">保存修改</button>
+              <button class="btn btn-primary" id="resubmitReviewBtn" type="button">修改后重新投入 OpenClaw</button>
+            </div>
+
+            <div id="reviewDecisionSummary" class="summary-box mt-3">
+              <strong>审核说明</strong>
+              <p>同意执行后会切换到结果界面；否决后请求不会进入沙箱。</p>
+            </div>
+            <pre id="taskDetail" class="result mt-3"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-result" class="app-view">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 04 / RESULT</p>
+          <h1>沙箱结果复核</h1>
+          <p>任务获批后会生成 Job ID，在这里查看状态、日志和结果。</p>
+        </div>
+
+        <div class="view-grid two">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">执行产物</p>
+                <h2>任务查询</h2>
+              </div>
+              <button class="btn btn-outline-secondary btn-sm" id="goReviewFromResultBtn" type="button">返回审核</button>
+            </div>
+
+            <label class="form-label" for="jobId">Job ID</label>
+            <input id="jobId" class="form-control mb-3" placeholder="同意执行后自动填入" />
+
+            <div class="button-row">
+              <button class="btn btn-outline-primary" id="statusBtn" type="button">状态</button>
+              <button class="btn btn-outline-primary" id="logsBtn" type="button">日志</button>
+              <button class="btn btn-outline-primary" id="resultBtn" type="button">结果</button>
+              <button class="btn btn-outline-dark" id="goSecurityFromResultBtn" type="button">安全审计</button>
+            </div>
+
+            <div id="taskDetailSummary" class="summary-box mt-3">
+              <strong>结果说明</strong>
+              <p>同意执行后才会生成任务。状态、日志和结果用于完成最终复核。</p>
+            </div>
+          </div>
+
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">最终复核</p>
+                <h2>状态 / 日志 / 结果</h2>
+              </div>
+            </div>
+            <pre id="taskDetailResultMirror" class="result mirror-note">任务输出会显示在审核界面的结果窗口中，也会同步到这里。</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-security" class="app-view">
+        <div class="view-hero">
+          <p class="eyebrow">STEP 05 / SECURITY</p>
+          <h1>CFL、策略与审计</h1>
+          <p>集中查看 UKey 状态、策略授权结果和审计记录。</p>
+        </div>
+
+        <div class="view-grid two">
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">可信接入</p>
+                <h2>CFL 与安全策略</h2>
+              </div>
+              <span id="cflModeBadge" class="status-pill muted">待检测</span>
+            </div>
+
+            <div class="button-row">
+              <button class="btn btn-outline-dark" id="cflStatusBtn" type="button">CFL 状态</button>
+              <button class="btn btn-outline-dark" id="cflDiagBtn" type="button">CFL 诊断</button>
+              <button class="btn btn-outline-dark" id="policyBtn" type="button">策略</button>
+            </div>
+
+            <div id="securitySummary" class="summary-box mt-3">
+              <strong>安全模块</strong>
+              <p>这里展示 UKey 接入、DLL 加载、策略授权和沙箱限制结果。</p>
+            </div>
+            <pre id="securityRaw" class="result compact mt-3"></pre>
+          </div>
+
+          <div class="panel section-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">操作留痕</p>
+                <h2>审计记录</h2>
+              </div>
+              <div class="audit-toolbar">
+                <select id="riskLevel" class="form-select form-select-sm">
+                  <option value="">全部风险</option>
+                  <option value="high">高风险</option>
+                  <option value="medium">中风险</option>
+                  <option value="low">低风险</option>
+                </select>
+                <button class="btn btn-outline-dark btn-sm" id="auditBtn" type="button">拉取审计</button>
+              </div>
+            </div>
+
+            <div id="auditSummary" class="audit-list">
+              <div class="empty-state">暂无审计展示。完成登录和任务操作后点击“拉取审计”。</div>
+            </div>
+            <pre id="auditResult" class="result compact mt-3"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./static/js/app.js?v=20260616-beijing-time"></script>
+  </body>
+</html>

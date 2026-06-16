@@ -1,0 +1,49 @@
+roles:
+  student:
+    allow_actions:
+      - run_openclaw
+      - analyze_file
+      - view_result
+    deny_actions:
+      - shell_exec
+      - export_secret
+      - manage_policy
+      - view_audit
+    docker:
+      network: false
+      memory: "512m"
+      cpu: 1
+      pids_limit: 128
+      max_runtime: 60
+  admin:
+    allow_actions:
+      - run_openclaw
+      - analyze_file
+      - export_result
+      - view_result
+      - view_audit
+      - manage_policy
+    deny_actions:
+      - shell_exec
+    docker:
+      network: true
+      memory: "1024m"
+      cpu: 2
+      pids_limit: 256
+      max_runtime: 300
+  auditor:
+    allow_actions:
+      - view_audit
+    deny_actions:
+      - run_openclaw
+      - analyze_file
+      - export_result
+      - shell_exec
+      - manage_policy
+    docker:
+      network: false
+      memory: "256m"
+      cpu: 1
+      pids_limit: 64
+      max_runtime: 30
+

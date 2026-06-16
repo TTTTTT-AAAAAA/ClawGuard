@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+*.sqlite3
+
+# Runtime artifacts
+jobs/
+runtime-logs/
+
+# Secrets
+.env
+
+# Binaries (too large for git)
+*.dll
+*.exe
+*.pdb
+
+# OS
+Thumbs.db
+.DS_Store
