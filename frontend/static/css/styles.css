@@ -679,6 +679,16 @@ body {
   border-radius: 8px;
 }
 
+.review-item-danger {
+  border-left: 3px solid #dc3545 !important;
+  background: #fff5f5 !important;
+}
+
+.review-item-danger:hover {
+  background: #ffe0e0 !important;
+  border-color: #dc3545 !important;
+}
+
 .review-item strong {
   display: block;
   margin: 5px 0;

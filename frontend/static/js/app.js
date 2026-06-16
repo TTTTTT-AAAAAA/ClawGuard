@@ -742,6 +742,108 @@ function bindEvents() {
       showRaw("cflRaw", error.message);
     }
   };
+
+  // ─── Step 6: 外来攻击拦截 ───
+  function renderThreatQueue(items) {
+    const list = $("threatList");
+    if (!items || items.length === 0) {
+      list.innerHTML = '<div class="empty-state">暂无拦截记录。安全。</div>';
+      $("threatCountBadge").textContent = "0 次拦截";
+      return;
+    }
+    $("threatCountBadge").textContent = `${items.length} 次拦截`;
+    list.innerHTML = items.map((item) => {
+      const analysis = item.analysis || {};
+      const risk = analysis.risk_level || "?";
+      const findings = (analysis.filter_result && analysis.filter_result.findings) || [];
+      const ruleNames = findings.map((f) => f.rule || "?").join(", ");
+      const ts = new Date(item.created_at).toLocaleString("zh-CN");
+      const isDeny = item.filter_decision === "DENY";
+      return `<button class="review-item${isDeny ? " review-item-danger" : ""}" data-review-id="${escapeHtml(item.review_id)}" type="button">
+        <div class="review-meta">
+          <span class="status-pill ${isDeny ? "fail" : "warn"}">${escapeHtml(item.filter_decision)}</span>
+          <small>${escapeHtml(ts)}</small>
+        </div>
+        <strong style="color:${isDeny ? "#dc3545" : "#fd7e14"}">${escapeHtml(item.action || "?")}</strong>
+        <small>${escapeHtml(ruleNames || "无规则匹配")}</small>
+        <small>风险: ${escapeHtml(risk)} | 建议: ${escapeHtml(item.recommendation || "?")}</small>
+      </button>`;
+    }).join("");
+
+    // Click handler
+    list.querySelectorAll(".review-item").forEach((btn) => {
+      btn.onclick = () => showThreatDetail(items.find((i) => i.review_id === btn.dataset.reviewId));
+    });
+  }
+
+  function showThreatDetail(item) {
+    if (!item) return;
+    selectedReview = item;
+    selectedReviewId = item.review_id;
+    const analysis = item.analysis || {};
+    const filterResult = analysis.filter_result || {};
+    const findings = filterResult.findings || [];
+    const reasons = analysis.reasons || [];
+
+    let html = `<strong>Review ID:</strong> ${escapeHtml(item.review_id)}<br>`;
+    html += `<strong>时间:</strong> ${new Date(item.created_at).toLocaleString("zh-CN")}<br>`;
+    html += `<strong>过滤裁决:</strong> ${escapeHtml(item.filter_decision)}<br>`;
+    html += `<strong>风险等级:</strong> ${escapeHtml(analysis.risk_level || "?")}<br>`;
+    html += `<strong>操作:</strong> ${escapeHtml(item.action || "?")}<br>`;
+    html += `<strong>来源:</strong> ${escapeHtml(analysis.source || "openclaw-main")}<br>`;
+    if (item.params) {
+      html += `<strong>参数:</strong> ${escapeHtml(JSON.stringify(item.params))}<br>`;
+    }
+    if (item.input_text) {
+      html += `<strong>输入内容:</strong> ${escapeHtml(item.input_text.substring(0, 200))}<br>`;
+    }
+    if (reasons.length) {
+      html += `<strong>拦截原因:</strong><ul>`;
+      reasons.forEach((r) => { html += `<li>⚠️ ${escapeHtml(r)}</li>`; });
+      html += `</ul>`;
+    }
+    if (findings.length) {
+      html += `<strong>匹配规则:</strong><ul>`;
+      findings.forEach((f) => {
+        const icon = f.level === "high" ? "🔴" : "🟡";
+        html += `<li>${icon} [${escapeHtml(f.level)}] ${escapeHtml((f.rule || "").substring(0, 80))}</li>`;
+      });
+      html += `</ul>`;
+    }
+    $("threatDetail").innerHTML = html;
+    showRaw("threatResult", item);
+  }
+
+  async function loadThreatQueue(filterDecision) {
+    try {
+      requireLogin();
+      let url = "/api/reviews?status=PENDING";
+      if (filterDecision && filterDecision !== "ALL") {
+        url += `&filter_decision=${encodeURIComponent(filterDecision)}`;
+      }
+      const body = await request(url, { headers: authHeaders() });
+      renderThreatQueue(body.items || []);
+    } catch (error) {
+      $("threatList").innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
+  }
+
+  $("refreshThreatBtn").onclick = () => {
+    loadThreatQueue($("threatFilter").value);
+  };
+
+  $("threatFilter").onchange = () => {
+    loadThreatQueue($("threatFilter").value);
+  };
+
+  // Load threat data when switching to threat view
+  const origSetView = setView;
+  setView = function(viewName) {
+    origSetView(viewName);
+    if (viewName === "threat") {
+      loadThreatQueue($("threatFilter").value);
+    }
+  };
 }
 
 bindEvents();

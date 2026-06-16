@@ -23,10 +23,12 @@ def capture_openclaw_task(
 @router.get("", response_model=dict)
 def get_review_queue(
     status: str | None = "PENDING",
+    filter_decision: str | None = None,
+    risk_level: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return {"items": list_reviews(db, user, status)}
+    return {"items": list_reviews(db, user, status=status, filter_decision=filter_decision, risk_level=risk_level)}
 
 
 @router.patch("/{review_id}", response_model=ReviewResponse)

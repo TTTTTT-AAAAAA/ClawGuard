@@ -128,13 +128,24 @@ def capture_review(db: Session, user: User, action: str, params: dict, input_tex
     return _to_response(review)
 
 
-def list_reviews(db: Session, user: User, status: str | None = "PENDING") -> list[dict]:
+def list_reviews(
+    db: Session,
+    user: User,
+    status: str | None = "PENDING",
+    filter_decision: str | None = None,
+    risk_level: str | None = None,
+) -> list[dict]:
     query = db.query(ReviewRequest)
     if user.role not in {"admin", "auditor"}:
         query = query.filter(ReviewRequest.uid == user.username)
     if status and status.upper() not in {"ALL", "*"}:
         query = query.filter(ReviewRequest.status == status)
-    return [_to_response(item) for item in query.order_by(ReviewRequest.created_at.desc()).limit(100).all()]
+    if filter_decision:
+        query = query.filter(ReviewRequest.filter_decision == filter_decision)
+    if risk_level:
+        # risk_level is stored inside analysis_json; use LIKE for simplicity
+        query = query.filter(ReviewRequest.analysis_json.like(f'%"risk_level": "{risk_level}"%'))
+    return [_to_response(item) for item in query.order_by(ReviewRequest.created_at.desc()).limit(200).all()]
 
 
 def get_review(db: Session, user: User, review_id: str) -> ReviewRequest:
