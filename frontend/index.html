@@ -214,27 +214,26 @@
             <div class="section-head">
               <div>
                 <p class="eyebrow">连接配置</p>
-                <h2>Agent 地址与注册</h2>
+                <h2>Agent 接入</h2>
               </div>
               <span id="agentStatusBadge" class="status-pill muted">未连接</span>
             </div>
 
-            <label class="form-label mt-2" for="agentAddress">Agent 地址</label>
-            <div class="input-group">
-              <input id="agentAddress" class="form-control" value="http://localhost:8000" placeholder="http://agent-ip:port" />
-              <button class="btn btn-outline-primary" id="registerAgentBtn2" type="button">注册</button>
-            </div>
-            <small class="text-muted">输入远程 OpenClaw Agent 的地址。留空则使用本地模拟模式。</small>
+            <label class="form-label" for="agentAddress">Agent 地址</label>
+            <input id="agentAddress" class="form-control" value="http://localhost:8000" placeholder="http://agent-ip:port" />
 
             <div class="button-row mt-3">
-              <button class="btn btn-outline-success" id="demoAttacksBtn" type="button">🔥 一键生成攻击样本</button>
-              <button class="btn btn-outline-info" id="demoSafeBtn" type="button">✅ 生成正常请求</button>
-              <button class="btn btn-outline-secondary" id="refreshAgentBtn" type="button">刷新状态</button>
+              <button class="btn btn-outline-success" id="demoAttacksBtn" type="button">🔥 攻击样本</button>
+              <button class="btn btn-outline-info" id="demoSafeBtn" type="button">✅ 正常请求</button>
+            </div>
+            <div class="button-row mt-2">
+              <button class="btn btn-outline-secondary btn-sm" id="registerAgentBtn2" type="button">注册 Agent</button>
+              <button class="btn btn-outline-secondary btn-sm" id="refreshAgentBtn" type="button">刷新</button>
             </div>
 
             <div id="agentSummary" class="summary-box mt-3">
               <strong>Agent 状态</strong>
-              <p>登录后点击「刷新状态」查看 Agent 连接情况。点「一键生成攻击样本」自动产生 6 条测试数据到审核队列。</p>
+              <p>登录后点击操作按钮。无需真实 Agent，点「攻击样本」即可演示。</p>
             </div>
             <pre id="agentRaw" class="result compact mt-3"></pre>
           </div>
@@ -243,15 +242,15 @@
             <p class="eyebrow">快速开始</p>
             <h2>三种使用模式</h2>
             <div class="guide-list">
-              <div><span>🖥</span><strong>本地模拟</strong><small>不配地址，直接点「一键生成攻击样本」即可演示所有功能。</small></div>
-              <div><span>🔗</span><strong>远程 Agent</strong><small>填写真实 OpenClaw Agent 地址，注册后自动推送数据。</small></div>
-              <div><span>🧪</span><strong>混合模式</strong><small>远程 Agent 接入的同时，用模拟按钮补充测试场景。</small></div>
+              <div><span>🖥</span><strong>本地模拟</strong><small>不配地址，直接生成测试数据</small></div>
+              <div><span>🔗</span><strong>远程 Agent</strong><small>填入真实地址注册</small></div>
+              <div><span>🧪</span><strong>混合模式</strong><small>模拟 + 远程同时使用</small></div>
             </div>
             <p class="eyebrow mt-4">预设攻击场景</p>
             <div class="guide-list">
               <div><span>🔥</span><strong>SQL 注入</strong><small>万能密码、联合查询、堆叠注入</small></div>
-              <div><span>🔥</span><strong>命令注入</strong><small>反弹 Shell、挖矿脚本、下载木马</small></div>
-              <div><span>🔥</span><strong>敏感泄露</strong><small>私钥、密码、微信路径、云元数据</small></div>
+              <div><span>🔥</span><strong>命令注入</strong><small>反弹 Shell、挖矿脚本</small></div>
+              <div><span>🔥</span><strong>敏感泄露</strong><small>私钥、密码、微信路径</small></div>
             </div>
           </div>
         </div>
@@ -259,7 +258,7 @@
 
       <section id="view-capture" class="app-view">
         <div class="view-hero">
-          <p class="eyebrow">STEP 02 / CAPTURE</p>
+          <p class="eyebrow">STEP 03 / CAPTURE</p>
           <h1>OpenClaw 自动捕获</h1>
           <p>低风险请求会自动通过并生成任务；有风险请求会自动拦截，等待人工审核。</p>
         </div>
@@ -341,7 +340,7 @@
 
       <section id="view-review" class="app-view">
         <div class="view-hero">
-          <p class="eyebrow">STEP 03 / REVIEW</p>
+          <p class="eyebrow">STEP 04 / REVIEW</p>
           <h1>人工审核队列</h1>
           <p>查看系统建议，决定同意执行、否决，或修改内容后重新预检。</p>
         </div>
@@ -414,7 +413,7 @@
 
       <section id="view-result" class="app-view">
         <div class="view-hero">
-          <p class="eyebrow">STEP 04 / RESULT</p>
+          <p class="eyebrow">STEP 05 / RESULT</p>
           <h1>沙箱结果复核</h1>
           <p>任务获批后会生成 Job ID，在这里查看状态、日志和结果。</p>
         </div>
@@ -513,7 +512,7 @@
            ════════════════════════════════════════════════════════ -->
       <section id="view-threat" class="app-view">
         <div class="view-hero">
-          <p class="eyebrow" style="color:#dc3545">⚠ THREAT INTELLIGENCE — STEP 06</p>
+          <p class="eyebrow" style="color:#dc3545">⚠ THREAT INTELLIGENCE — STEP 07</p>
           <h1>外来恶意请求拦截</h1>
           <p>ClawGuard 输入过滤器拦截的外部恶意请求记录，包括 SQL 注入、路径穿越、敏感数据泄露等攻击。</p>
         </div>

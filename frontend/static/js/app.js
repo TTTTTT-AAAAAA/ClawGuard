@@ -870,7 +870,8 @@ function bindEvents() {
   };
 
   // Load threat data when switching to threat view
-  $("registerAgentBtn").onclick = async () => {
+  const agentRegisterBtn = $("registerAgentBtn") || $("registerAgentBtn2");
+  agentRegisterBtn.onclick = async () => {
     try {
       requireLogin();
       const address = $("agentAddress").value;
