@@ -1,4 +1,5 @@
-let token = "";
+// 从 login.html 获取 token
+let token = localStorage.getItem("clawguard_token") || "";
 let lastJobId = "";
 let lastUsername = "";
 let selectedReviewId = "";
@@ -1281,5 +1282,21 @@ function bindEvents() {
 bindEvents();
 activateSample("normal");
 setSidebarCollapsed(localStorage.getItem("clawguard.sidebarCollapsed") === "1");
-setView("login");
-healthCheck();
+
+// 来自 login.html 的重定向校验
+const savedUser = localStorage.getItem("clawguard_user");
+if (token && savedUser) {
+  try {
+    const u = JSON.parse(savedUser);
+    lastUsername = u.username;
+    setPill("navLoginBadge", `${u.username} / ${u.role}`, "ok");
+    setCard("loginCard", "已登录", `${u.username}，角色 ${u.role}`, "ok");
+    setSummary("loginSummary", "已通过安全认证", "凭据验证通过，可以直接开始操作。", "ok");
+    setCard("agentCard", "就绪", "已登录，可配置 Agent 或运行模拟测试", "ok");
+    refreshAgentStatus();
+    healthCheck();
+    setView("agent");
+  } catch { window.location.href = "login.html"; }
+} else {
+  window.location.href = "login.html";
+}

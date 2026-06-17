@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ClawGuard · 安全接入</title>
+  <link rel="icon" href="./static/img/clawguard-logo.png" />
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a28;
+      --surface: #222233;
+      --surface-2: #2a2a3e;
+      --red: #d94444;
+      --red-glow: rgba(217, 68, 68, 0.35);
+      --red-dim: rgba(217, 68, 68, 0.12);
+      --gold: #d48a3a;
+      --text: #e8e6e3;
+      --text-dim: #8a8884;
+      --line: rgba(255, 255, 255, 0.06);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(90deg, rgba(217,68,68,0.03) 1px, transparent 1px),
+        linear-gradient(rgba(217,68,68,0.03) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% -20%, rgba(217,68,68,0.08) 0%, transparent 50%),
+        var(--bg);
+      background-size: 28px 28px, 28px 28px, auto, auto;
+    }
+
+    /* ── Login Container ── */
+    .login-container {
+      display: flex;
+      align-items: center;
+      gap: 60px;
+      padding: 40px;
+    }
+
+    /* ── Brand Side ── */
+    .brand-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .brand-logo-wrap {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-logo-wrap::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent, var(--red-glow), transparent, var(--gold), transparent);
+      animation: spinRing 4s linear infinite;
+      mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+    }
+
+    @keyframes spinRing {
+      to { transform: rotate(360deg); }
+    }
+
+    .brand-logo-wrap img {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+      border-radius: 16px;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 0 20px var(--red-glow));
+    }
+
+    .brand-name {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, var(--red), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    /* ── Form Side ── */
+    .form-side {
+      width: 360px;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 36px 32px;
+      box-shadow:
+        0 0 0 1px var(--red-dim),
+        0 24px 48px rgba(0,0,0,0.4),
+        0 0 60px var(--red-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--red), var(--gold), transparent);
+    }
+
+    .login-card::after {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, var(--red-dim) 0%, transparent 60%);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .login-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.25s ease;
+    }
+
+    .form-group input:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px var(--red-dim), 0 0 20px var(--red-glow);
+      background: #2e2e44;
+    }
+
+    .form-group input::placeholder {
+      color: rgba(255,255,255,0.15);
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, var(--red), #b82e2e);
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+      letter-spacing: 1px;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 0 1px var(--red-dim), 0 8px 24px var(--red-glow);
+    }
+
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 0 1px var(--red-dim), 0 12px 32px var(--red-glow);
+    }
+
+    .login-btn:active {
+      transform: translateY(0);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .login-error {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: rgba(217,68,68,0.1);
+      border: 1px solid rgba(217,68,68,0.25);
+      border-radius: 8px;
+      color: #e66868;
+      font-size: 13px;
+      display: none;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-error.show {
+      display: block;
+    }
+
+    /* ── Scanning Line ── */
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+      animation: scanDown 3s ease-in-out infinite;
+      z-index: 0;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    @keyframes scanDown {
+      0%, 100% { top: 10%; }
+      50% { top: 90%; }
+    }
+
+    /* ── Loading Spinner ── */
+    .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin: 0 auto;
+    }
+
+    .spinner.show { display: inline-block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Version ── */
+    .version {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      opacity: 0.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <!-- Brand -->
+    <div class="brand-side">
+      <div class="brand-logo-wrap">
+        <img src="./static/img/clawguard-logo.png" alt="ClawGuard" />
+      </div>
+      <div class="brand-name">ClawGuard</div>
+      <div class="brand-sub">Security Operations</div>
+    </div>
+
+    <!-- Form -->
+    <div class="form-side">
+      <div class="login-card">
+        <div class="scan-line"></div>
+        <div class="login-title">安全接入认证</div>
+        <div class="login-desc">输入管理员凭证以进入控制台</div>
+
+        <div class="form-group">
+          <label for="username">用户名</label>
+          <input id="username" class="form-control" value="admin" autocomplete="username" />
+        </div>
+
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input id="password" class="form-control" value="admin123" type="password" autocomplete="current-password" />
+        </div>
+
+        <button class="login-btn" id="loginBtn" type="button">
+          <span id="btnText">进入控制台</span>
+          <span id="btnSpinner" class="spinner"></span>
+        </button>
+
+        <div class="login-error" id="loginError"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="version">CLawGuard v2.0 · Secure Access Gateway</div>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+    const loginBtn = document.getElementById("loginBtn");
+    const username = document.getElementById("username");
+    const password = document.getElementById("password");
+    const errorBox = document.getElementById("loginError");
+    const btnText = document.getElementById("btnText");
+    const btnSpinner = document.getElementById("btnSpinner");
+
+    // Enter key to submit
+    password.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loginBtn.click();
+    });
+    username.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loginBtn.click();
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      errorBox.classList.remove("show");
+      errorBox.textContent = "";
+      loginBtn.disabled = true;
+      btnText.style.display = "none";
+      btnSpinner.classList.add("show");
+
+      try {
+        const res = await fetch(API + "/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: username.value, password: password.value }),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.detail || "认证失败");
+        localStorage.setItem("clawguard_token", body.access_token);
+        localStorage.setItem("clawguard_user", JSON.stringify({ username: username.value, role: body.role }));
+        window.location.href = "index.html";
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.classList.add("show");
+        loginBtn.disabled = false;
+        btnText.style.display = "inline";
+        btnSpinner.classList.remove("show");
+      }
+    });
+  </script>
+</body>
+</html>
