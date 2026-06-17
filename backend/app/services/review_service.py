@@ -146,7 +146,7 @@ def list_reviews(
     if risk_level:
         # risk_level is stored inside analysis_json; use LIKE for simplicity
         query = query.filter(ReviewRequest.analysis_json.like(f'%"risk_level": "{risk_level}"%'))
-    return [_to_response(item) for item in query.order_by(ReviewRequest.created_at.desc()).limit(200).all()]
+    return [_to_response(item) for item in query.order_by(ReviewRequest.created_at.desc()).limit(1000).all()]
 
 
 def get_review(db: Session, user: User, review_id: str) -> ReviewRequest:

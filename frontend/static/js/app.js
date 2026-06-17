@@ -220,6 +220,13 @@ async function openView(viewName) {
       setSummary("reviewDecisionSummary", "队列刷新失败", error.message, "fail");
     }
   }
+  if (currentView === "security" && token && $("analyticsBtn")) {
+    try {
+      await loadAnalytics();
+    } catch (error) {
+      $("analyticsSummary").innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
+  }
 }
 
 function setPill(id, text, state = "muted") {
@@ -493,7 +500,7 @@ function summarizeCflDiag(body) {
 
 function renderAudit(body) {
   const items = body.items || body.audit || body.logs || [];
-  const list = Array.isArray(items) ? items.slice(0, 6) : [];
+  const list = Array.isArray(items) ? items : [];
   if (!list.length) {
     $("auditSummary").innerHTML = '<div class="empty-state">没有匹配的审计记录。</div>';
     return;
@@ -509,6 +516,226 @@ function renderAudit(body) {
       </article>`;
     })
     .join("");
+}
+
+function parseRecordTime(value) {
+  if (!value) return null;
+  const raw = String(value);
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  const date = new Date(hasTimezone ? raw : `${raw}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function beijingDateParts(date) {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+}
+
+function beijingDateLabel(date) {
+  const parts = beijingDateParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function periodBucket(date, period) {
+  const parts = beijingDateParts(date);
+  if (period === "month") {
+    return { label: `${parts.year}-${parts.month}`, sort: Number(`${parts.year}${parts.month}00`) };
+  }
+  if (period === "week") {
+    const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Shanghai", weekday: "short" }).format(date);
+    const weekdayIndex = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[weekday] ?? 1;
+    const mondayOffset = (weekdayIndex + 6) % 7;
+    const midnight = new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00+08:00`);
+    const start = new Date(midnight.getTime() - mondayOffset * 86400000);
+    const end = new Date(start.getTime() + 6 * 86400000);
+    return { label: `${beijingDateLabel(start)} ~ ${beijingDateLabel(end)}`, sort: start.getTime() };
+  }
+  return { label: `${parts.year}-${parts.month}-${parts.day}`, sort: Number(`${parts.year}${parts.month}${parts.day}`) };
+}
+
+function reviewRisk(item) {
+  const analysis = item.analysis || {};
+  return (analysis.risk_level || item.risk_level || "low").toLowerCase();
+}
+
+function reviewIsAttack(item) {
+  const decision = String(item.filter_decision || "").toUpperCase();
+  const recommendation = String(item.recommendation || item.analysis?.recommendation || "").toLowerCase();
+  const risk = reviewRisk(item);
+  return decision === "DENY" || decision === "MASK" || risk === "high" || risk === "medium" || recommendation === "reject" || recommendation === "modify";
+}
+
+function matchesAnalyticsFilter(item, source, riskFilter) {
+  const isAttack = reviewIsAttack(item);
+  const risk = reviewRisk(item);
+  if (source === "attack" && !isAttack) return false;
+  if (source === "capture" && isAttack) return false;
+  if (riskFilter && risk !== riskFilter) return false;
+  return true;
+}
+
+function renderLineChart(rows) {
+  const width = 820;
+  const height = 300;
+  const pad = { left: 48, right: 28, top: 28, bottom: 46 };
+  const max = Math.max(...rows.map((row) => row.count), 1);
+  const xSpan = Math.max(rows.length - 1, 1);
+  const points = rows.map((row, index) => {
+    const x = pad.left + (index / xSpan) * (width - pad.left - pad.right);
+    const y = pad.top + (1 - row.count / max) * (height - pad.top - pad.bottom);
+    return { ...row, x, y };
+  });
+  const polyline = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const area = `${pad.left},${height - pad.bottom} ${polyline} ${width - pad.right},${height - pad.bottom}`;
+  const labelEvery = Math.max(1, Math.ceil(rows.length / 6));
+  const labels = points
+    .filter((_, index) => index % labelEvery === 0 || index === points.length - 1)
+    .map((point) => `<text class="analytics-line-label" x="${point.x.toFixed(1)}" y="${height - 16}" text-anchor="middle">${escapeHtml(point.label)}</text>`)
+    .join("");
+  const circles = points
+    .map((point) => `<g>
+      <circle class="analytics-line-dot" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4.5"></circle>
+      <text class="analytics-line-value" x="${point.x.toFixed(1)}" y="${(point.y - 10).toFixed(1)}" text-anchor="middle">${point.count}</text>
+    </g>`)
+    .join("");
+  const gridLines = [0, 0.25, 0.5, 0.75, 1]
+    .map((ratio) => {
+      const y = pad.top + ratio * (height - pad.top - pad.bottom);
+      const value = Math.round(max * (1 - ratio));
+      return `<line class="analytics-grid-line" x1="${pad.left}" y1="${y.toFixed(1)}" x2="${width - pad.right}" y2="${y.toFixed(1)}"></line>
+        <text class="analytics-y-label" x="${pad.left - 10}" y="${(y + 4).toFixed(1)}" text-anchor="end">${value}</text>`;
+    })
+    .join("");
+  return `<svg class="analytics-line-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="历史事件折线图">
+    <defs>
+      <linearGradient id="trendLineGradient" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0%" stop-color="#d94444"></stop>
+        <stop offset="100%" stop-color="#d48a3a"></stop>
+      </linearGradient>
+      <linearGradient id="trendAreaGradient" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#d94444" stop-opacity="0.28"></stop>
+        <stop offset="100%" stop-color="#d48a3a" stop-opacity="0.02"></stop>
+      </linearGradient>
+    </defs>
+    ${gridLines}
+    <polygon class="analytics-line-area" points="${area}"></polygon>
+    <polyline class="analytics-line-path" points="${polyline}"></polyline>
+    ${circles}
+    ${labels}
+  </svg>`;
+}
+
+function stageStats(items) {
+  return items.reduce(
+    (acc, item) => {
+      acc.captured += 1;
+      const decision = String(item.filter_decision || "").toUpperCase();
+      const status = String(item.status || "").toUpperCase();
+      const recommendation = String(item.recommendation || item.analysis?.recommendation || "").toLowerCase();
+      if (decision === "DENY" || recommendation === "reject") acc.blocked += 1;
+      if (status === "PENDING") acc.pending += 1;
+      if (status === "APPROVED") acc.approved += 1;
+      if (item.job_id) acc.executed += 1;
+      if (status === "REJECTED") acc.rejected += 1;
+      return acc;
+    },
+    { captured: 0, blocked: 0, pending: 0, approved: 0, executed: 0, rejected: 0 },
+  );
+}
+
+function renderAnalytics(items, period, source, riskFilter, audits = []) {
+  const filtered = items.filter((item) => matchesAnalyticsFilter(item, source, riskFilter));
+  const stats = filtered.reduce(
+    (acc, item) => {
+      const risk = reviewRisk(item);
+      const isAttack = reviewIsAttack(item);
+      acc.total += 1;
+      if (isAttack) acc.attack += 1;
+      else acc.capture += 1;
+      acc.risk[risk] = (acc.risk[risk] || 0) + 1;
+      return acc;
+    },
+    { total: 0, attack: 0, capture: 0, risk: { high: 0, medium: 0, low: 0 } },
+  );
+
+  $("analyticsSummary").innerHTML = `
+    <div class="analytics-stat"><span>总记录数</span><strong>${stats.total}</strong></div>
+    <div class="analytics-stat"><span>自动捕获</span><strong>${stats.capture}</strong></div>
+    <div class="analytics-stat"><span>攻击拦截</span><strong>${stats.attack}</strong></div>
+    <div class="analytics-stat"><span>审计事件</span><strong>${audits.length}</strong></div>
+  `;
+
+  const buckets = new Map();
+  filtered.forEach((item) => {
+    const date = parseRecordTime(item.created_at);
+    if (!date) return;
+    const bucket = periodBucket(date, period);
+    const current = buckets.get(bucket.label) || { label: bucket.label, sort: bucket.sort, count: 0 };
+    current.count += 1;
+    buckets.set(bucket.label, current);
+  });
+  const rows = [...buckets.values()].sort((a, b) => a.sort - b.sort);
+  if (!rows.length) {
+    $("analyticsChart").innerHTML = '<div class="empty-state">当前筛选条件下没有可统计的数据。</div>';
+    $("analyticsPie").innerHTML = '<div class="empty-state">当前筛选条件下没有风险分布数据。</div>';
+    $("analyticsStage").innerHTML = '<div class="empty-state">当前筛选条件下没有阶段数据。</div>';
+    setPill("analyticsTrendBadge", "暂无数据", "muted");
+    return;
+  }
+  setPill("analyticsTrendBadge", `${rows.length} 个时间段`, "ok");
+  $("analyticsChart").innerHTML = renderLineChart(rows);
+
+  const totalRisk = Math.max(stats.risk.high + stats.risk.medium + stats.risk.low, 1);
+  const highDeg = Math.round((stats.risk.high / totalRisk) * 360);
+  const mediumDeg = Math.round((stats.risk.medium / totalRisk) * 360);
+  $("analyticsPie").innerHTML = `
+    <div class="analytics-pie" style="--high:${highDeg}deg;--medium:${mediumDeg}deg">
+      <div class="analytics-pie-center"><strong>${stats.total}</strong><span>历史记录</span></div>
+    </div>
+    <div class="analytics-legend">
+      <div class="analytics-legend-item"><span class="legend-dot high"></span><span>高危</span><strong>${stats.risk.high || 0}</strong></div>
+      <div class="analytics-legend-item"><span class="legend-dot medium"></span><span>中危</span><strong>${stats.risk.medium || 0}</strong></div>
+      <div class="analytics-legend-item"><span class="legend-dot low"></span><span>低危</span><strong>${stats.risk.low || 0}</strong></div>
+    </div>
+  `;
+
+  const stages = stageStats(filtered);
+  const stageRows = [
+    ["捕获进入", stages.captured],
+    ["自动拦截", stages.blocked],
+    ["等待审核", stages.pending],
+    ["审核通过", stages.approved],
+    ["沙箱执行", stages.executed],
+    ["人工否决", stages.rejected],
+  ];
+  const maxStage = Math.max(...stageRows.map((entry) => entry[1]), 1);
+  $("analyticsStage").innerHTML = stageRows
+    .map(([label, count]) => {
+      const width = Math.max(4, Math.round((count / maxStage) * 100));
+      return `<div class="stage-row">
+        <span class="stage-label">${escapeHtml(label)}</span>
+        <div class="stage-track"><div class="stage-fill" style="width:${width}%"></div></div>
+        <span class="stage-value">${count}</span>
+      </div>`;
+    })
+    .join("");
+}
+
+async function loadAnalytics() {
+  requireLogin();
+  const period = $("analyticsPeriod").value;
+  const source = $("analyticsSource").value;
+  const risk = $("analyticsRisk").value;
+  const [reviews, audits] = await Promise.all([
+    request("/api/reviews?status=ALL", { headers: authHeaders() }),
+    request("/api/audit", { headers: authHeaders() }).catch(() => ({ items: [] })),
+  ]);
+  renderAnalytics(reviews.items || [], period, source, risk, audits.items || []);
 }
 
 async function healthCheck() {
@@ -862,6 +1089,21 @@ function bindEvents() {
       $("auditSummary").innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     }
   };
+
+  $("analyticsBtn").onclick = async () => {
+    try {
+      await loadAnalytics();
+    } catch (error) {
+      $("analyticsSummary").innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+      $("analyticsChart").innerHTML = '<div class="empty-state">图表生成失败。</div>';
+    }
+  };
+
+  ["analyticsPeriod", "analyticsSource", "analyticsRisk"].forEach((id) => {
+    $(id).onchange = () => {
+      if (currentView === "security" && token) $("analyticsBtn").click();
+    };
+  });
 
   $("cflStatusBtn").onclick = async () => {
     try {
