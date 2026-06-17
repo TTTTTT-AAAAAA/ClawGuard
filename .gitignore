@@ -30,3 +30,7 @@ runtime-logs/
 # OS
 Thumbs.db
 .DS_Store
+
+# Editor backups
+*.current
+*.png

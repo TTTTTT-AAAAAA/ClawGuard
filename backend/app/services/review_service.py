@@ -29,8 +29,9 @@ def _as_beijing(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is not None:
-        return value.astimezone(BEIJING_TZ).replace(tzinfo=None)
-    return value
+        return value.astimezone(BEIJING_TZ)
+    # 数据库存的是不含时区的北京时间，加上 +08:00 让 JSON 序列化正确
+    return value.replace(tzinfo=BEIJING_TZ)
 
 
 def _analyze(action: str, params: dict, input_text: str | None, source: str = "openclaw") -> dict:

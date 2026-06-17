@@ -41,12 +41,125 @@ function renderJson(value) {
   if (typeof value === "string") return value;
   return JSON.stringify(value, null, 2);
 }
+function updateTaskDetailMirror(value) {
+  const el = $("taskDetailResultMirror");
+  if (!el) return;
 
-function showRaw(id, value) {
-  $(id).textContent = renderJson(value);
-  if (id === "taskDetail" && $("taskDetailResultMirror")) {
-    $("taskDetailResultMirror").textContent = renderJson(value);
+  // 字符串错误
+  if (typeof value === "string") {
+    el.className = "summary-box fail";
+    el.innerHTML = `<strong>错误</strong><p>${escapeHtml(value)}</p>`;
+    return;
   }
+
+  // 无数据
+  if (!value || Object.keys(value).length === 0) {
+    el.className = "summary-box";
+    el.innerHTML = `<strong>空结果</strong><p>暂无数据。</p>`;
+    return;
+  }
+
+  let title = "";
+  let detail = "";
+  let state = "ok";
+
+  if (value.job_id) {
+    // ── 任务详情（状态/日志/结果）──
+    const status = value.status || "UNKNOWN";
+    const action = value.action || "-";
+    const exitCode = value.exit_code !== undefined && value.exit_code !== null ? `退出码 ${value.exit_code}` : "";
+    const riskScore = value.risk_score !== undefined ? ` | 风险评分 ${value.risk_score}` : "";
+
+    title = `任务 ${status}`;
+    detail = `Job: ${value.job_id} | 动作: ${action}`;
+    if (exitCode) detail += ` | ${exitCode}`;
+    if (riskScore) detail += riskScore;
+
+    if (status === "SUCCESS") state = "ok";
+    else if (status === "FAILED" || status === "ERROR") state = "fail";
+    else state = "warn";
+
+    // 追加额外信息
+    const extras = [];
+    if (value.params) extras.push(`参数: ${JSON.stringify(value.params)}`);
+    if (value.input_text) extras.push(`输入: ${String(value.input_text).substring(0, 100)}${String(value.input_text).length > 100 ? "…" : ""}`);
+    if (value.error_message) extras.push(`错误: ${value.error_message}`);
+    if (value.summary) extras.push(`摘要: ${value.summary}`);
+    if (value.created_at) extras.push(`创建: ${formatTime(value.created_at)}`);
+    if (value.finished_at) extras.push(`完成: ${formatTime(value.finished_at)}`);
+
+    // 日志（截取前 200 字）
+    if (value.logs) {
+      const logText = String(value.logs).substring(0, 200);
+      extras.push(`<details class="detail-expand"><summary>日志 (${String(value.logs).length} 字符)</summary><pre class="log-snippet">${escapeHtml(logText)}${String(value.logs).length > 200 ? "…" : ""}</pre></details>`);
+    }
+    // 执行结果（截取前 200 字）
+    if (value.result && typeof value.result === "object") {
+      extras.push(`结果: ${JSON.stringify(value.result).substring(0, 150)}`);
+    } else if (value.result && typeof value.result === "string") {
+      extras.push(`<details class="detail-expand"><summary>执行结果</summary><pre class="log-snippet">${escapeHtml(value.result.substring(0, 500))}</pre></details>`);
+    }
+
+    detail += `<div class="mirror-extras small-text">${extras.join("<br>")}</div>`;
+
+  } else if (value.review_id) {
+    // ── 审核相关（捕获/审批/否决/修改）──
+    const filterDecision = value.filter_decision || "-";
+    const recommendation = value.recommendation || "-";
+    const status = value.status || "PENDING";
+    const action = value.action || "-";
+
+    if (status === "APPROVED" && value.job_id) {
+      title = `✅ 已同意 — 任务已生成`;
+      detail = `Review: ${value.review_id} | Job: ${value.job_id}`;
+      state = "ok";
+    } else if (status === "REJECTED") {
+      title = `❌ 已否决`;
+      detail = `Review: ${value.review_id}`;
+      state = "fail";
+    } else if (status === "APPROVED") {
+      title = `✅ 已同意（待执行）`;
+      detail = `Review: ${value.review_id}`;
+      state = "ok";
+    } else {
+      title = `⏳ 待审核 — ${recommendation}`;
+      detail = `Review: ${value.review_id} | 动作: ${action} | 过滤: ${filterDecision}`;
+      state = recommendation === "reject" ? "fail" : recommendation === "modify" ? "warn" : "neutral";
+    }
+
+    const extras = [];
+    if (value.params) extras.push(`参数: ${JSON.stringify(value.params).substring(0, 100)}`);
+    if (value.input_text) extras.push(`输入: ${String(value.input_text).substring(0, 100)}${String(value.input_text).length > 100 ? "…" : ""}`);
+    if (value.note) extras.push(`备注: ${value.note}`);
+    if (value.created_at) extras.push(`时间: ${formatTime(value.created_at)}`);
+
+    // 分析结果
+    const analysis = value.analysis || {};
+    if (analysis.risk_level) extras.push(`风险等级: ${analysis.risk_level}`);
+    if (analysis.reasons && analysis.reasons.length) {
+      extras.push(`<div class="mirror-reasons">拦截原因:<ul>${analysis.reasons.map(r => `<li>⚠️ ${escapeHtml(r)}</li>`).join("")}</ul></div>`);
+    }
+    if (analysis.filter_result && analysis.filter_result.findings && analysis.filter_result.findings.length) {
+      extras.push(`<div class="mirror-reasons">匹配规则:<ul>${analysis.filter_result.findings.slice(0, 5).map(f => `<li>${f.level === "high" ? "🔴" : "🟡"} [${escapeHtml(f.level)}] ${escapeHtml((f.rule || "").substring(0, 60))}</li>`).join("")}</ul></div>`);
+    }
+
+    detail += `<div class="mirror-extras small-text">${extras.join("<br>")}</div>`;
+
+  } else {
+    // ── 其他对象 ├──
+    el.className = "summary-box neutral";
+    const entries = Object.entries(value).slice(0, 8);
+    const lines = entries.map(([k, v]) => {
+      const label = k.replace(/_/g, " ");
+      const val = typeof v === "object" ? JSON.stringify(v).substring(0, 80) : String(v).substring(0, 80);
+      return `<span class="mirror-line"><strong>${escapeHtml(label)}</strong>: ${escapeHtml(val)}</span>`;
+    }).join("<br>");
+    el.innerHTML = `<strong>响应摘要</strong><div class="mirror-extras small-text">${lines}</div>`;
+    return;
+  }
+
+  el.className = `summary-box ${state}`.trim();
+  el.innerHTML = `<strong>${escapeHtml(title)}</strong><div class="mirror-detailed">${detail}</div>`;
 }
 
 function formatTime(value) {
@@ -284,12 +397,30 @@ function renderReviewQueue(items) {
       const item = items.find((entry) => entry.review_id === button.dataset.reviewId);
       if (item) {
         summarizeReview(item);
-        showRaw("taskSubmitResult", item);
-        showRaw("taskDetail", item);
+        updateTaskDetailMirror(item);
         renderReviewQueue(items);
+        openDecisionPanel();
       }
     });
   });
+}
+
+function openDecisionPanel() {
+  const panel = $("reviewDecisionPanel");
+  const backdrop = $("reviewDecisionBackdrop");
+  if (panel) panel.classList.add("active");
+  if (backdrop) backdrop.classList.add("active");
+  const queue = document.querySelector(".review-queue-panel");
+  if (queue) queue.classList.add("has-decision");
+}
+
+function closeDecisionPanel() {
+  const panel = $("reviewDecisionPanel");
+  const backdrop = $("reviewDecisionBackdrop");
+  if (panel) panel.classList.remove("active");
+  if (backdrop) backdrop.classList.remove("active");
+  const queue = document.querySelector(".review-queue-panel");
+  if (queue) queue.classList.remove("has-decision");
 }
 
 function renderCaptureRecords(items) {
@@ -360,11 +491,6 @@ function summarizeCflDiag(body) {
   setSummary("cflSummary", "CFL 诊断完成", detail, state);
 }
 
-function summarizePolicy(body) {
-  const roles = body.roles ? Object.keys(body.roles).join("、") : "已读取";
-  setSummary("securitySummary", "策略已读取", `当前策略包含角色：${roles}。任务提交时会按动作、角色和沙箱限制进行授权。`, "ok");
-}
-
 function renderAudit(body) {
   const items = body.items || body.audit || body.logs || [];
   const list = Array.isArray(items) ? items.slice(0, 6) : [];
@@ -391,7 +517,6 @@ async function healthCheck() {
     setCard("backendCard", "连接正常", body.status || "后端 API 可访问", "ok");
     setPill("navApiBadge", `API ${apiBase().replace(/^https?:\/\//, "")}`, "ok");
     setSummary("loginSummary", "后端连接正常", "可以继续登录并提交沙箱任务。", "ok");
-    showRaw("cflRaw", body);
   } catch (error) {
     setCard("backendCard", "连接失败", error.message, "fail");
     setPill("navApiBadge", "API 不可用", "fail");
@@ -425,7 +550,7 @@ async function refreshAgentStatus() {
     $("agentSummary").innerHTML =
       `<strong>Agent 状态</strong><p>已注册 ${count} 个 Agent${count ? "：" + agents.map(a => a.name + "@" + (a.address || "local")).join(", ") : ""} | 内置模拟可用: ${body.local_stub_available ? "✅" : "❌"} | 攻击模板: ${body.demo_attacks_count} 种</p>`;
     setCard("agentCard", count > 0 ? `${count} 个 Agent 在线` : "本地模式", count > 0 ? agents.map(a => a.name).join(", ") : "未注册远程 Agent，使用本地模拟", count > 0 ? "ok" : "warn");
-    showRaw("agentRaw", body);
+    setPill("agentStatusBadge", count > 0 ? "已连接" : "未连接", count > 0 ? "ok" : "muted");
   } catch (error) {
     $("agentSummary").innerHTML = `<strong>Agent 状态</strong><p>${escapeHtml(error.message)}</p>`;
   }
@@ -443,7 +568,6 @@ async function submitTask() {
   $("jobId").value = body.job_id;
   setPill("filterBadge", "已通过", "ok");
   summarizeTaskResult(body);
-  showRaw("taskSubmitResult", body);
 }
 
 async function captureTask() {
@@ -455,15 +579,14 @@ async function captureTask() {
     body: JSON.stringify({ action: $("action").value, params, input_text: getInputText(), source: "openclaw_web" }),
   });
   summarizeReview(body);
-  showRaw("taskSubmitResult", body);
   if (body.job_id) {
     lastJobId = body.job_id;
     $("jobId").value = body.job_id;
-    showRaw("taskDetail", body);
+    updateTaskDetailMirror(body);
     try {
       await loadTask("/result", "result");
     } catch {
-      showRaw("taskDetail", body);
+      updateTaskDetailMirror(body);
     }
   }
   await loadReviewQueue();
@@ -503,7 +626,7 @@ async function approveReview() {
   setPill("filterBadge", "已同意", "ok");
   setCard("taskCard", "已放行执行", body.job_id ? `Job ID：${body.job_id}` : body.review_id, "ok");
   setSummary("taskDetailSummary", "审核通过", "任务已进入 Docker 沙箱执行，可以查看状态、日志和结果。", "ok");
-  showRaw("taskDetail", body);
+  updateTaskDetailMirror(body);
   await loadReviewQueue();
   setView("result");
 }
@@ -520,7 +643,7 @@ async function rejectReview() {
   setPill("filterBadge", "已否决", "fail");
   setCard("taskCard", "已否决", body.review_id, "fail");
   setSummary("reviewDecisionSummary", "审核否决", "该 OpenClaw 请求不会进入沙箱执行。", "fail");
-  showRaw("taskDetail", body);
+  updateTaskDetailMirror(body);
   await loadReviewQueue();
 }
 
@@ -539,7 +662,6 @@ async function modifyReview() {
     }),
   });
   summarizeReview(body);
-  showRaw("taskSubmitResult", body);
   await loadReviewQueue();
 }
 
@@ -558,15 +680,14 @@ async function resubmitReview() {
     }),
   });
   summarizeReview(body);
-  showRaw("taskDetail", body);
-  showRaw("taskSubmitResult", body);
+  updateTaskDetailMirror(body);
   if (body.job_id) {
     lastJobId = body.job_id;
     $("jobId").value = body.job_id;
     try {
       await loadTask("/result", "result");
     } catch {
-      showRaw("taskDetail", body);
+      updateTaskDetailMirror(body);
     }
   }
   await loadReviewQueue();
@@ -582,7 +703,7 @@ async function loadTask(suffix, mode) {
   if (mode === "status") summarizeTaskStatus(body);
   if (mode === "logs") summarizeLogs(body);
   if (mode === "result") summarizeResult(body);
-  showRaw("taskDetail", body);
+  updateTaskDetailMirror(body);
 }
 
 function bindEvents() {
@@ -625,7 +746,6 @@ function bindEvents() {
       setPill("filterBadge", "已拦截", "fail");
       setCard("taskCard", "捕获失败", error.message, "fail");
       setSummary("taskSubmitSummary", "捕获失败", error.message, "fail");
-      showRaw("taskSubmitResult", error.message);
     }
   };
 
@@ -645,7 +765,7 @@ function bindEvents() {
       await approveReview();
     } catch (error) {
       setSummary("reviewDecisionSummary", "同意失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -654,7 +774,7 @@ function bindEvents() {
       await rejectReview();
     } catch (error) {
       setSummary("reviewDecisionSummary", "否决失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -663,7 +783,7 @@ function bindEvents() {
       await modifyReview();
     } catch (error) {
       setSummary("reviewDecisionSummary", "修改失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -672,7 +792,7 @@ function bindEvents() {
       await resubmitReview();
     } catch (error) {
       setSummary("reviewDecisionSummary", "重新投递失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -681,7 +801,7 @@ function bindEvents() {
       await loadTask("", "status");
     } catch (error) {
       setSummary("taskDetailSummary", "状态读取失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -690,7 +810,7 @@ function bindEvents() {
       await loadTask("/logs", "logs");
     } catch (error) {
       setSummary("taskDetailSummary", "日志读取失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -699,7 +819,7 @@ function bindEvents() {
       await loadTask("/result", "result");
     } catch (error) {
       setSummary("taskDetailSummary", "结果读取失败", error.message, "fail");
-      showRaw("taskDetail", error.message);
+      updateTaskDetailMirror(error.message);
     }
   };
 
@@ -716,8 +836,10 @@ function bindEvents() {
     $("statusBtn").click();
   };
 
-  $("goCaptureBtn").onclick = () => setView("capture");
-  $("goSecurityFromReviewBtn").onclick = () => setView("security");
+  $("goCaptureBtn").onclick = () => { closeDecisionPanel(); setView("capture"); };
+  $("goSecurityFromReviewBtn").onclick = () => { closeDecisionPanel(); setView("security"); };
+  $("closeDecisionBtn").onclick = () => closeDecisionPanel();
+  $("reviewDecisionBackdrop").onclick = () => closeDecisionPanel();
   $("goReviewFromResultBtn").onclick = () => setView("review");
   $("goSecurityFromResultBtn").onclick = () => setView("security");
 
@@ -736,22 +858,8 @@ function bindEvents() {
       const risk = $("riskLevel").value;
       const body = await request(`/api/audit${risk ? `?risk_level=${risk}` : ""}`, { headers: authHeaders() });
       renderAudit(body);
-      showRaw("auditResult", body);
     } catch (error) {
       $("auditSummary").innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
-      showRaw("auditResult", error.message);
-    }
-  };
-
-  $("policyBtn").onclick = async () => {
-    try {
-      requireLogin();
-      const body = await request("/api/policies", { headers: authHeaders() });
-      summarizePolicy(body);
-      showRaw("securityRaw", body);
-    } catch (error) {
-      setSummary("securitySummary", "策略读取失败", error.message, "fail");
-      showRaw("securityRaw", error.message);
     }
   };
 
@@ -759,11 +867,9 @@ function bindEvents() {
     try {
       const body = await request("/api/auth/cfl/status");
       summarizeCflStatus(body);
-      showRaw("cflRaw", body);
     } catch (error) {
       setCard("cflCard", "CFL 状态失败", error.message, "fail");
       setSummary("cflSummary", "CFL 状态读取失败", error.message, "fail");
-      showRaw("cflRaw", error.message);
     }
   };
 
@@ -772,10 +878,8 @@ function bindEvents() {
       requireLogin();
       const body = await request("/api/auth/cfl/diagnostics", { headers: authHeaders() });
       summarizeCflDiag(body);
-      showRaw("cflRaw", body);
     } catch (error) {
       setSummary("cflSummary", "CFL 诊断失败", error.message, "fail");
-      showRaw("cflRaw", error.message);
     }
   };
 
@@ -791,7 +895,7 @@ function bindEvents() {
     list.innerHTML = items.map((item) => {
       const analysis = item.analysis || {};
       const risk = analysis.risk_level || "?";
-      const ts = new Date(item.created_at).toLocaleString("zh-CN");
+      const ts = formatTime(item.created_at);
       const isDeny = item.filter_decision === "DENY";
       return `<button class="review-item${isDeny ? " review-item-danger" : ""}" data-review-id="${escapeHtml(item.review_id)}" type="button">
         <div class="review-meta">
@@ -819,7 +923,7 @@ function bindEvents() {
     const reasons = analysis.reasons || [];
 
     let html = `<strong>Review ID:</strong> ${escapeHtml(item.review_id)}<br>`;
-    html += `<strong>时间:</strong> ${new Date(item.created_at).toLocaleString("zh-CN")}<br>`;
+    html += `<strong>时间:</strong> ${formatTime(item.created_at)}<br>`;
     html += `<strong>过滤裁决:</strong> ${escapeHtml(item.filter_decision)}<br>`;
     html += `<strong>风险等级:</strong> ${escapeHtml(analysis.risk_level || "?")}<br>`;
     html += `<strong>操作:</strong> ${escapeHtml(item.action || "?")}<br>`;
@@ -844,7 +948,6 @@ function bindEvents() {
       html += `</ul>`;
     }
     $("threatDetail").innerHTML = html;
-    showRaw("threatResult", item);
   }
 
   async function loadThreatQueue(filterDecision) {
@@ -901,7 +1004,6 @@ function bindEvents() {
       $("agentSummary").innerHTML =
         `<strong>攻击样本已生成</strong><p>共 ${results.length} 条 | 拦截 ${denied} 条 | 放行 ${approved} 条</p>`;
       setCard("agentCard", "测试完成", `${results.length} 条请求已进入审核队列`, "ok");
-      showRaw("agentRaw", body);
     } catch (error) {
       $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
     }
@@ -917,7 +1019,6 @@ function bindEvents() {
       const review = body.review || {};
       $("agentSummary").innerHTML =
         `<strong>正常请求已生成</strong><p>Review: ${review.review_id} | Filter: ${review.filter_decision} | Rec: ${review.recommendation}</p>`;
-      showRaw("agentRaw", body);
     } catch (error) {
       $("agentSummary").innerHTML = `<strong>生成失败</strong><p>${escapeHtml(error.message)}</p>`;
     }
@@ -926,6 +1027,7 @@ function bindEvents() {
   const origSetView = setView;
   setView = function(viewName) {
     origSetView(viewName);
+    closeDecisionPanel();
     if (viewName === "threat") {
       loadThreatQueue($("threatFilter").value);
     } else if (viewName === "agent") {
